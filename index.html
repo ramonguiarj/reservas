@@ -221,18 +221,69 @@ function voucher(id) {
   w.document.close();
 }
 
-async function openConfig() {
-  const inv = (await db.from('invites').select('*')).data || [];
-  $('#dlg').innerHTML = `<form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form><h2 style="margin:0">Equipe e configurações</h2>
-  <h3>Pessoas com acesso</h3>${Object.values(team).map(m => `<div class="line"><span>${esc(m.name)} · ${esc(m.email)}</span><span class="m">${m.role === 'owner' ? 'dono' : 'equipe'}</span></div>`).join('')}
-  ${inv.map(i => `<div class="line"><span>${esc(i.email)}</span><span class="m">convite pendente</span></div>`).join('')}
-  <label for="i_em">Convidar por e-mail</label><div class="row"><input id="i_em" type="email"><button onclick="invite()" style="flex:0 0 auto">Convidar</button></div>
-  <div class="m">A pessoa usa “Criar conta” com esse mesmo e-mail.</div>
-  <h3>Dados do voucher</h3>
-  <label for="a_nm">Nome que aparece no voucher</label><input id="a_nm" value="${esc(acc.name)}">
-  <label for="a_rv">Link de avaliação</label><input id="a_rv" value="${esc(acc.review_url)}">
-  <label for="a_cp">Política de cancelamento</label><textarea id="a_cp" rows="5">${esc(acc.cancel_policy)}</textarea>
-  <div class="acts"><button onclick="saveConfig()">Salvar configurações</button></div>`;
+async function openItineraries() {
+  const r = await db.from('itineraries')
+    .select('*')
+    .eq('account_id', acc.id)
+    .order('name');
+
+  if (r.error) return alert(r.error.message);
+
+  const items = r.data || [];
+
+  $('#dlg').innerHTML = `
+    <form method="dialog" style="text-align:right">
+      <button class="alt">Fechar</button>
+    </form>
+
+    <h2 style="margin:0">Itinerários</h2>
+    <p class="m">Cadastre os roteiros que você oferece.</p>
+
+    <h3>Novo itinerário</h3>
+
+    <label for="it_name">Nome</label>
+    <input id="it_name" placeholder="Ex.: Cristo + Pão de Açúcar">
+
+    <label for="it_desc">Descrição</label>
+    <textarea id="it_desc" rows="3" placeholder="Ex.: Cristo Redentor, Pão de Açúcar e fotos nos principais pontos."></textarea>
+
+    <div class="row">
+      <div>
+        <label for="it_duration">Duração</label>
+        <input id="it_duration" placeholder="Ex.: 5 horas">
+      </div>
+
+      <div>
+        <label for="it_price">Preço (R$)</label>
+        <input id="it_price" type="number" step="0.01" min="0" placeholder="599.90">
+      </div>
+    </div>
+
+    <div class="acts">
+      <button class="lime" onclick="saveItinerary()">Cadastrar itinerário</button>
+    </div>
+
+    <h3>Itinerários cadastrados</h3>
+
+    ${
+      items.length
+      ? items.map(i => `
+        <div class="line">
+          <span>
+            <b>${esc(i.name)}</b>
+            <br>
+            <span class="m">
+              ${esc(i.duration || '')}
+              ${i.price ? ' · ' + brl(i.price) : ''}
+              ${i.active ? ' · ativo' : ' · inativo'}
+            </span>
+          </span>
+        </div>
+      `).join('')
+      : '<div class="empty">Nenhum itinerário cadastrado.</div>'
+    }
+  `;
+
   $('#dlg').showModal();
 }
 async function invite() {
