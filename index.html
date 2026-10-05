@@ -132,6 +132,13 @@ function go(n) { week = n ? addDays(week, n) : monday(new Date()); load(); }
 
 async function openBooking(id) {
   const b = id ? bookings.find(x => x.id === id) : { status:'aberta', pax:1, total:0, tour_date: iso(new Date()), payments: [] };
+    const ir = await db.from('itineraries')
+    .select('*')
+    .eq('account_id', acc.id)
+    .eq('active', true)
+    .order('name');
+
+  const itineraries = ir.data || [];
   const locked = id && b.status !== 'aberta' && me.role !== 'owner';
   const dis = locked ? 'disabled' : '';
   let hist = [];
