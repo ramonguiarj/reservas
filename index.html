@@ -115,9 +115,15 @@ function render() {
     h += `<div class="day">${names[d.getDay()]}, ${dBR(iso(d)).slice(0,5)}</div>`;
     for (const b of list) {
       const open = Number(b.total) - paid(b);
-      h += `<div class="card ${b.status}" onclick="openBooking('${b.id}')"><div class="top"><b>${esc((b.tour_time || '').slice(0,5))} ${esc(b.client_name)}</b><span class="tag ${b.status}">${b.status}</span></div>
-      <div class="m">${esc(b.itinerary || 'Sem roteiro')} · ${b.pax} pessoa(s)</div>
-      <div class="m">Total ${brl(b.total)} · Pago ${brl(paid(b))} · <span class="${open > 0 ? 'open' : 'ok'}">${open > 0 ? 'Em aberto ' + brl(open) : 'Quitado'}</span></div></div>`;
+      h += `<div class="card ${b.status}" onclick="openBooking('${b.id}')">
+  <div class="top">
+    <b>${esc((b.tour_time || '').slice(0,5))} ${esc(b.client_name)}</b>
+    <span class="tag ${b.status}">${b.status}</span>
+  </div>
+  <div class="m"><b>${esc(b.booking_code || 'Sem código')}</b></div>
+  <div class="m">${esc(b.itinerary || 'Sem roteiro')} · ${b.pax} pessoa(s)</div>
+  <div class="m">Total ${brl(b.total)} · Pago ${brl(paid(b))} · <span class="${open > 0 ? 'open' : 'ok'}">${open > 0 ? 'Em aberto ' + brl(open) : 'Quitado'}</span></div>
+</div>`;
     }
   }
   $('#app').innerHTML = h + '</main>';
