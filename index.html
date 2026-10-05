@@ -340,17 +340,21 @@ async function saveConfig() {
   $('#dlg').close(); render();
 }
 start();
-  function applyItineraryPrice() {
+function applyItineraryPrice() {
   const select = $('#c_it');
   const option = select.options[select.selectedIndex];
 
   if (!option || !option.value) return;
 
   const price = Number(option.dataset.price || 0);
+  const pax = Number($('#c_px').value) || 1;
 
   if (price > 0) {
-    $('#c_tt').value = price.toFixed(2);
+    $('#c_tt').value = (price * pax).toFixed(2);
   }
+}
+function applyPaxPrice() {
+  applyItineraryPrice();
 }
 </script>
 </body>
