@@ -286,7 +286,31 @@ async function openItineraries() {
 
   $('#dlg').showModal();
 }
-async function invite() {
+async function saveItinerary() {
+  const name = val('it_name').trim();
+  const description = val('it_desc').trim();
+  const duration = val('it_duration').trim();
+  const price = Number(val('it_price')) || 0;
+
+  if (!name) {
+    return alert('Informe o nome do itinerário.');
+  }
+
+  const r = await db.from('itineraries').insert({
+    account_id: acc.id,
+    name,
+    description: description || null,
+    duration: duration || null,
+    price,
+    active: true
+  });
+
+  if (r.error) return alert(r.error.message);
+
+  alert('Itinerário cadastrado com sucesso!');
+  openItineraries();
+}
+  async function invite() {
   const email = val('i_em').trim().toLowerCase();
   if (!email) return;
   const r = await db.from('invites').insert({ email, account_id: acc.id, role: 'staff' });
