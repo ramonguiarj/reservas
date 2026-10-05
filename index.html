@@ -426,15 +426,28 @@ function loginView(msg){
 
 async function login(){
 
+  const email = val('em').trim();
+  const password = val('pw');
+
+  if(!email || !password){
+    return $('#msg').textContent =
+      'Informe o e-mail e a senha.';
+  }
+
   const r = await db.auth.signInWithPassword({
-    email:val('em').trim(),
-    password:val('pw')
+    email,
+    password
   });
 
   if(r.error){
+    console.error(r.error);
+
     return $('#msg').textContent =
-      'E-mail ou senha incorretos.';
+      r.error.message;
   }
+
+  await start();
+}
 
   start();
 }
