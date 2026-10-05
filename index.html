@@ -176,10 +176,52 @@ ${id && b.booking_code ? `<div class="m" style="margin-top:6px"><b>Código:</b> 
     h += `<h3>Pagamentos <span class="m">(pago ${brl(paid(b))} de ${brl(b.total)})</span></h3>`;
     h += pays.length ? pays.map(p => `<div class="line"><span class="${p.voided ? 'void' : ''}">${brl(p.amount)} · ${esc(p.method)} · ${dBR(p.paid_at)} · por ${esc(nm(p.created_by))}</span>
       ${me.role === 'owner' && !p.voided ? `<button class="bad" onclick="voidPay('${p.id}','${id}')">Estornar</button>` : (p.voided ? '<span class="m">estornado</span>' : '')}</div>`).join('') : '<div class="m">Nenhum pagamento lançado.</div>';
-    if (b.status === 'aberta') h += `<div class="row" style="margin-top:8px;align-items:end"><div><label for="p_amt">Valor</label><input id="p_amt" type="number" step="0.01" min="0"></div>
-      <div><label for="p_met">Forma</label><select id="p_met"><option>Pix</option><option>Dinheiro</option><option>Cartão</option></select></div>
-      <div><label for="p_dt">Data</label><input id="p_dt" type="date" value="${iso(new Date())}"></div></div>
-      <div class="acts"><button class="lime" onclick="addPay('${id}')">Lançar pagamento</button></div>`;
+    if (b.status === 'aberta') h += `<div class="row" style="margin-top:8px;align-items:end">
+      <div>
+        <label for="p_amt">Valor</label>
+        <input id="p_amt" type="number" step="0.01" min="0">
+      </div>
+
+      <div>
+        <label for="p_type">Tipo</label>
+        <select id="p_type">
+          <option value="sinal">Sinal</option>
+          <option value="parcial">Parcial</option>
+          <option value="total">Total</option>
+          <option value="saldo">Saldo</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="p_met">Forma</label>
+        <select id="p_met">
+          <option value="Pix">Pix</option>
+          <option value="Cartão de crédito">Cartão de crédito</option>
+          <option value="Cartão de débito">Cartão de débito</option>
+          <option value="Transferência">Transferência</option>
+          <option value="Dinheiro">Dinheiro</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="p_inst">Parcelas</label>
+        <input id="p_inst" type="number" min="1" value="1">
+      </div>
+
+      <div>
+        <label for="p_dt">Data</label>
+        <input id="p_dt" type="date" value="${iso(new Date())}">
+      </div>
+    </div>
+
+    <label for="p_note">Observação</label>
+    <input id="p_note" placeholder="Ex.: entrada da reserva">
+
+    <div class="acts">
+      <button class="lime" onclick="addPay('${id}')">Lançar pagamento</button>
+    </div>`;
     h += '<div class="acts">';
     if (b.status === 'aberta') h += (me.role === 'owner' ? `<button onclick="setStatus('${id}','finalizada')">Finalizar reserva</button>` : '') + `<button class="bad" onclick="setStatus('${id}','cancelada')">Cancelar reserva</button>`;
     else if (me.role === 'owner') h += `<button class="alt" onclick="setStatus('${id}','aberta')">Reabrir</button>`;
