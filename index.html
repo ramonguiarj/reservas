@@ -201,7 +201,12 @@ function voucher(id) {
   w.document.write(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Voucher</title>
   <body style="font:16px/1.5 system-ui;max-width:600px;margin:20px auto;padding:0 14px;color:#17201b">
   <h1 style="color:#0f3d2e;margin-bottom:0">${esc(acc.name)}</h1><p style="margin-top:0">Confirmação de reserva</p><hr>
-  <p><b>Cliente:</b> ${esc(b.client_name)}<br><b>Data:</b> ${dBR(b.tour_date)} ${esc((b.tour_time || '').slice(0,5))}<br><b>Roteiro:</b> ${esc(b.itinerary)}<br><b>Pessoas:</b> ${b.pax}<br>
+  <p>
+  <b>Código da reserva:</b> ${esc(b.booking_code || '—')}<br>
+  <b>Cliente:</b> ${esc(b.client_name)}<br>
+  <b>Data:</b> ${dBR(b.tour_date)} ${esc((b.tour_time || '').slice(0,5))}<br>
+  <b>Roteiro:</b> ${esc(b.itinerary)}<br>
+  <b>Pessoas:</b> ${b.pax}<br>
   <b>Ingresso:</b> ${b.ticket_included ? 'incluso' : 'não incluso'}</p>
   <p><b>Valor total:</b> ${brl(b.total)}<br><b>Pago:</b> ${brl(paid(b))}<br><b>Em aberto:</b> ${brl(open)}</p>
   <h3>Política de cancelamento</h3><p style="white-space:pre-wrap">${esc(acc.cancel_policy || 'Defina a política em Equipe.')}</p>
