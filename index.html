@@ -236,7 +236,13 @@ ${id && b.booking_code ? `<div class="m" style="margin-top:6px"><b>Código:</b> 
 }
 
 async function saveBooking(id) {
-  const v = { client_name: val('c_name').trim(), client_phone: val('c_tel').trim(), tour_date: val('c_dt'), tour_time: val('c_hr') || null,
+  const v = {
+  client_name: val('c_name').trim(),
+  client_phone: val('c_tel').trim(),
+  client_email: val('c_email').trim(),
+  client_document: val('c_doc').trim(),
+  tour_date: val('c_dt'),
+  tour_time: val('c_hr') || null,
     itinerary: val('c_it'), pax: Number(val('c_px')) || 1, total: Number(val('c_tt')) || 0,
     ticket_included: $('#c_ti').checked, ticket_bought: $('#c_tb').checked, notes: val('c_nt') };
   if (!v.client_name || !v.tour_date) return alert('Informe o nome do cliente e a data.');
