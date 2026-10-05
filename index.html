@@ -241,10 +241,35 @@ async function saveBooking(id) {
 }
 async function addPay(bid) {
   const amount = Number(val('p_amt'));
-  if (!(amount > 0)) return alert('Informe o valor do pagamento.');
-  const r = await db.from('payments').insert({ booking_id: bid, account_id: acc.id, amount, method: val('p_met'), paid_at: val('p_dt') });
+  const payment_type = val('p_type');
+  const method = val('p_met');
+  const installments = Number(val('p_inst')) || 1;
+  const paid_at = val('p_dt');
+  const notes = val('p_note').trim();
+
+  if (!(amount > 0)) {
+    return alert('Informe o valor do pagamento.');
+  }
+
+  if (method !== 'Cartão de crédito' && installments !== 1) {
+    return alert('Parcelas só podem ser usadas no cartão de crédito.');
+  }
+
+  const r = await db.from('payments').insert({
+    booking_id: bid,
+    account_id: acc.id,
+    amount,
+    method,
+    payment_type,
+    installments,
+    notes: notes || null,
+    paid_at
+  });
+
   if (r.error) return alert(r.error.message);
-  await load(); openBooking(bid);
+
+  await load();
+  openBooking(bid);
 }
 async function voidPay(pid, bid) {
   if (!confirm('Estornar este pagamento?')) return;
