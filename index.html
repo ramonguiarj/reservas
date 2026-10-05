@@ -105,7 +105,7 @@ function render() {
   const days = [0,1,2,3,4,5,6].map(i => addDays(week, i));
   const names = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   let h = `<header><b>${esc(acc.name)}</b><button class="lime" onclick="openBooking()">Nova reserva</button>
-    ${me.role === 'owner' ? '<button class="alt" onclick="openConfig()">Equipe</button>' : ''}<button class="alt" onclick="logout()">Sair</button></header>
+    ${me.role === 'owner' ? '<button class="alt" onclick="openConfig()">Equipe</button><button class="alt" onclick="openItineraries()">Itinerários</button>' : ''}<button class="alt" onclick="logout()">Sair</button></header>
     <main><div class="nav"><button class="alt" onclick="go(-7)">‹</button><b>${dBR(iso(week)).slice(0,5)} a ${dBR(iso(addDays(week,6))).slice(0,5)}</b>
     <button class="alt" onclick="go(7)">›</button><button class="alt" onclick="go(0)">Hoje</button></div>`;
   if (!bookings.length) h += '<div class="empty">Nenhuma reserva nesta semana. Toque em “Nova reserva”.</div>';
