@@ -1,5 +1,5 @@
-<!doctype html>https://ewhfabhktkvrjddnvgkl.supabase.co/rest/v1/
-<html lang="pt-BR">sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU
+<!doctype html>
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -45,8 +45,10 @@ h3{margin:14px 0 6px}
 <dialog id="dlg"></dialog>
 <script>
 // 1) Cole aqui os dados do seu projeto Supabase (Project Settings > API)
-const SUPABASE_URL = 'COLE_AQUI_A_URL_DO_PROJETO';
-const SUPABASE_KEY = 'COLE_AQUI_A_CHAVE_ANON';
+const SUPABASE_URL = 'https://ewhfabhktkvrjddnvgkl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
