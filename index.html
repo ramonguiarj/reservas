@@ -159,7 +159,7 @@ ${id && b.booking_code ? `<div class="m" style="margin-top:6px"><b>Código:</b> 
 <label for="c_doc">Documento de identificação</label>
 <input id="c_doc" value="${esc(b.client_document)}" placeholder="CPF, RG ou passaporte" ${dis}>
   <div class="row"><div><label for="c_dt">Data</label><input id="c_dt" type="date" value="${b.tour_date}" ${dis}></div>
-  <div><label for="c_hr">Hora</label><input id="c_hr" type="time" value="${(b.tour_time || '').slice(0,5)}" ${dis}></div></div>
+  <input id="c_hr" type="time" value="${(b.tour_time || '').slice(0,5)}" ${dis}>
   <label for="c_it">Roteiro</label>
 <label for="c_it">Roteiro</label>
 <select id="c_it" ${dis} onchange="applyItineraryPrice()">
