@@ -156,6 +156,7 @@ ${id && b.booking_code ? `<div class="m" style="margin-top:6px"><b>Código:</b> 
   <div class="row"><div><label for="c_dt">Data</label><input id="c_dt" type="date" value="${b.tour_date}" ${dis}></div>
   <div><label for="c_hr">Hora</label><input id="c_hr" type="time" value="${(b.tour_time || '').slice(0,5)}" ${dis}></div></div>
   <label for="c_it">Roteiro</label>
+<label for="c_it">Roteiro</label>
 <select id="c_it" ${dis} onchange="applyItineraryPrice()">
   <option value="">Selecione um itinerário</option>
   ${itineraries.map(i => `
