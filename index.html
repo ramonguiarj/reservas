@@ -49,8 +49,6 @@ const SUPABASE_URL = 'https://ewhfabhktkvrjddnvgkl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU';
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl = n => Number(n || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
