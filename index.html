@@ -290,6 +290,16 @@ h3{
   overflow-wrap:anywhere
 }
 
+.booking-tabs{display:flex;gap:4px;overflow-x:auto;margin:14px 0 12px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.booking-actionbar{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+.booking-actionbar button{padding:7px 10px;font-size:14px}
+.booking-tabs button{flex:none;border-radius:8px 8px 0 0;background:transparent;color:var(--mut);border-bottom:3px solid transparent;padding:9px 10px;white-space:nowrap}
+.booking-tabs button[aria-selected="true"]{color:var(--g);border-bottom-color:var(--l);font-weight:700}
+.booking-tab-panel{display:none}
+.booking-tab-panel.active{display:block}
+.booking-info{background:#f5f6f2;border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0}
+.booking-info strong{display:block;color:var(--mut);font-size:12px;font-weight:600}
+
 @media(max-width:520px){
   .summary{grid-template-columns:1fr}
   .summary-card{padding:10px 12px}
@@ -474,6 +484,7 @@ let selectedDate = iso(new Date());
 let agendaFilter = {year:String(new Date().getFullYear()),month:String(new Date().getMonth()+1),date:'',status:'todos'};
 let activeTab = 'agenda';
 let authMode = 'login';
+let activeBookingTab = 'dados';
 
 function accessLevel(){
   return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
@@ -1791,7 +1802,77 @@ async function openBooking(id){
 
   $('#dlg').innerHTML = h;
 
+  if(id) configureBookingTabs(id,b);
+
   $('#dlg').showModal();
+}
+
+function setBookingTab(key,button){
+  activeBookingTab=key;
+  document.querySelectorAll('.booking-tab-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.tab===key));
+  document.querySelectorAll('.booking-tabs button').forEach(tab=>tab.setAttribute('aria-selected',String(tab===button)));
+}
+
+function editBookingFromToolbar(){
+  const tab=document.querySelector('.booking-tabs button[role="tab"]');
+  setBookingTab('dados',tab);
+  $('#c_name')?.focus();
+}
+
+function sendBookingVoucherWhatsApp(id){
+  const booking=bookings.find(item=>item.id===id);
+  if(!booking) return alert('Não encontrei esta reserva. Atualize a agenda e tente novamente.');
+  const phone=String(booking.client_phone||'').replace(/\D/g,'');
+  if(!phone) return alert('Cadastre o WhatsApp do cliente antes de preparar o envio.');
+  const locator=booking.booking_code||booking.id;
+  const services=bookingServices(booking).map(item=>`• ${dBR(item.tour_date)}${item.tour_time?' às '+String(item.tour_time).slice(0,5):''} — ${item.itinerary} — ${item.pax} pessoa(s)`).join('\n');
+  const message=`Olá ${String(booking.client_name||'').trim().split(/\s+/)[0]||'tudo bem'}! Seguem os dados da sua reserva ${locator}:\n\n${services}\n\n${booking.pickup_location?`Ponto de encontro/busca: ${booking.pickup_location}\n`:''}${booking.client_message?`Informações importantes: ${booking.client_message}\n`:''}Em caso de dúvidas, fale com a equipe.`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,'_blank','noopener');
+}
+
+function configureBookingTabs(id,booking){
+  const dlg=$('#dlg');
+  const header=document.createElement('div');
+  header.className='booking-header';
+  const panels={dados:document.createElement('section'),financeiro:document.createElement('section'),carrinho:document.createElement('section'),alteracoes:document.createElement('section')};
+  for(const [key,panel] of Object.entries(panels)){panel.className='booking-tab-panel'+(key==='dados'?' active':'');panel.dataset.tab=key;}
+  let current='dados';
+  let started=false;
+  for(const node of Array.from(dlg.children)){
+    if(node.matches('form') || (!started && node.tagName!=='H3')){header.append(node);continue;}
+    if(node.tagName==='H3'){
+      started=true;
+      const title=node.textContent.trim().toLowerCase();
+      if(title.includes('pagamentos') || title.includes('valores e sinal')) current='financeiro';
+      else if(title.includes('histórico')) current='alteracoes';
+      else if(title.includes('serviço') || title.includes('roteiros') || title.includes('voucher')) current='carrinho';
+      else if(title.includes('dados do cliente')) current='dados';
+    }
+    (panels[current]||panels.dados).append(node);
+  }
+
+  const customerHistory=bookings.filter(item=>item.id!==id && (
+    (booking.client_document && String(item.client_document||'').replace(/\D/g,'')===String(booking.client_document).replace(/\D/g,'')) ||
+    (booking.client_email && String(item.client_email||'').trim().toLowerCase()===String(booking.client_email).trim().toLowerCase())
+  ));
+  const people=document.createElement('section');
+  people.className='booking-tab-panel';people.dataset.tab='participantes';
+  people.innerHTML=`<h3>Participantes</h3><div class="booking-info"><strong>Cliente responsável</strong>${esc(booking.client_name||'—')}</div><div class="booking-info"><strong>Quantidade de pessoas</strong>${Number(booking.pax||0)} pessoa(s)</div><div class="booking-info"><strong>Documento</strong>${esc(booking.client_document||'—')}</div>`;
+  const history=document.createElement('section');
+  history.className='booking-tab-panel';history.dataset.tab='historico';
+  history.innerHTML=`<h3>Histórico do cliente</h3>${customerHistory.length?customerHistory.map(item=>`<div class="booking-info" role="button" tabindex="0" onclick="openBooking('${item.id}')"><strong>${esc(item.booking_code||'Reserva')} · ${dBR(item.tour_date)}</strong>${esc(item.itinerary||'Serviço')} · ${esc(item.status||'')}</div>`).join(''):'<div class="empty">Nenhuma outra reserva encontrada para este cliente.</div>'}`;
+
+  const tabs=[['dados','Dados'],['financeiro','Financeiro'],['participantes','Participantes'],['carrinho','Carrinho'],['historico','Histórico do cliente'],['alteracoes','Alterações']];
+  const nav=document.createElement('nav');nav.className='booking-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Seções da reserva');
+  nav.innerHTML=tabs.map(([key,label])=>`<button type="button" role="tab" aria-selected="${key==='dados'}" onclick="setBookingTab('${key}',this)">${label}</button>`).join('');
+  const actionbar=document.createElement('div');actionbar.className='booking-actionbar';
+  actionbar.innerHTML=`${canManage()?'<button type="button" class="alt" onclick="editBookingFromToolbar()">Editar reserva</button>':''}${canAdd()?`<button type="button" class="alt" onclick="sendBookingVoucher('${id}')">Enviar voucher por e-mail</button>`:''}<button type="button" class="alt" onclick="sendBookingVoucherWhatsApp('${id}')">Enviar voucher por WhatsApp</button><button type="button" class="alt" onclick="voucher('${id}')">Voucher</button><button type="button" class="alt" onclick="voucher('${id}',true)">Voucher sem valores</button>${booking.status==='aberta'&&canManage()?`<button type="button" class="lime" onclick="setStatus('${id}','finalizada')">Finalizar</button>`:''}`;
+  for(const button of Array.from(dlg.querySelectorAll('button'))){
+    if(button.textContent.trim()==='Visualizar voucher' || button.textContent.trim()==='Finalizar reserva') button.remove();
+  }
+  for(const button of Array.from(dlg.querySelectorAll('button[onclick^="saveBooking"]'))){actionbar.append(button);}
+  activeBookingTab='dados';
+  dlg.replaceChildren(header,actionbar,nav,panels.dados,panels.financeiro,people,panels.carrinho,history,panels.alteracoes);
 }
 
 
@@ -2175,7 +2256,7 @@ async function sendBookingVoucher(id){
 }
 
 
-function voucher(id){
+function voucher(id,hideValues=false){
 
   const b =
     bookings.find(x => x.id === id);
@@ -2239,7 +2320,7 @@ function voucher(id){
       <section class="section"><h2>Informações da reserva</h2><div class="content">${esc(serviceDetails)}</div></section>
       ${voucherBenefits.length ? `<section class="section"><h2>Itens inclusos</h2><div class="content">${esc(voucherBenefits.join('\n'))}</div></section>` : ''}
       <section class="section"><h2>Endereço e ponto de encontro</h2><div class="content">${hasTransport ? '<b>Transporte incluso:</b> a busca será na hospedagem informada ou no ponto de encontro combinado.\n' : ''}${esc(pickup)}</div></section>
-      <section class="section"><h2>Pagamento</h2><div class="content"><b>Valor total:</b> ${brl(b.total)}\n<b>Sinal e pagamentos recebidos:</b> ${brl(paid(b))}\n<b>Saldo em aberto:</b> ${brl(open)}</div></section>
+      ${hideValues ? '' : `<section class="section"><h2>Pagamento</h2><div class="content"><b>Valor total:</b> ${brl(b.total)}\n<b>Sinal e pagamentos recebidos:</b> ${brl(paid(b))}\n<b>Saldo em aberto:</b> ${brl(open)}</div></section>`}
 
 
       <section class="section"><h2>Informações para o cliente</h2><div class="content">${b.client_message ? esc(b.client_message) : 'Estamos felizes em receber você no passeio!'}</div></section>
