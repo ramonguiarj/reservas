@@ -473,6 +473,7 @@ let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
 let agendaFilter = {year:String(new Date().getFullYear()),month:String(new Date().getMonth()+1),date:'',status:'todos'};
 let activeTab = 'agenda';
+let authMode = 'login';
 
 function accessLevel(){
   return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
@@ -490,9 +491,15 @@ function accessLabel(level){
 
 async function start(){
 
+  const recovery = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
+
   const {
     data:{session}
   } = await db.auth.getSession();
+
+  if(recovery && session){
+    return passwordRecoveryView();
+  }
 
   if(!session){
     return loginView();
@@ -530,6 +537,8 @@ async function start(){
 function loginView(msg){
 
   const invitedEmail = new URLSearchParams(location.search).get('convite') || '';
+  const signingUp = authMode === 'signup';
+  const forgot = authMode === 'forgot';
 
   $('#app').innerHTML = `
     <div id="login">
@@ -549,26 +558,123 @@ function loginView(msg){
       <input
         id="pw"
         type="password"
-        autocomplete="current-password"
+        autocomplete="${signingUp ? 'new-password' : 'current-password'}"
       >
+
+      <button type="button" class="alt" onclick="togglePassword('pw',this)">Mostrar senha</button>
+
+      ${signingUp ? `
+        <ul class="m" id="password-rules">
+          <li data-rule="length">Pelo menos 8 caracteres</li>
+          <li data-rule="upper">Uma letra maiúscula</li>
+          <li data-rule="lower">Uma letra minúscula</li>
+          <li data-rule="number">Um número</li>
+          <li data-rule="special">Um caractere especial (ex.: !, @ ou #)</li>
+        </ul>
+        <label for="pw_confirm">Repita a senha</label>
+        <input id="pw_confirm" type="password" autocomplete="new-password">
+        <button type="button" class="alt" onclick="togglePassword('pw_confirm',this)">Mostrar confirmação</button>
+      ` : ''}
 
       <p class="open" id="msg">
         ${esc(msg || '')}
       </p>
 
       <div class="acts">
-        <button onclick="login()">Entrar</button>
-
-        <button
-          class="alt"
-          onclick="signup()"
-        >
-          Criar conta com convite
-        </button>
+        ${forgot ? `
+          <button onclick="sendPasswordRecovery()">Enviar link para redefinir senha</button>
+          <button class="alt" onclick="setAuthMode('login')">Voltar para entrar</button>
+        ` : signingUp ? `
+          <button onclick="signup()">Criar conta com convite</button>
+          <button class="alt" onclick="setAuthMode('login')">Voltar para entrar</button>
+        ` : `
+          <button onclick="login()">Entrar</button>
+          <button class="alt" onclick="setAuthMode('signup')">Criar conta com convite</button>
+          <button class="alt" onclick="setAuthMode('forgot')">Esqueci minha senha</button>
+        `}
       </div>
 
     </div>
   `;
+}
+
+function setAuthMode(mode){
+  const email = $('#em')?.value.trim();
+  if(email){
+    const url = new URL(location.href);
+    url.searchParams.set('convite',email);
+    history.replaceState(null,'',url);
+  }
+  authMode = mode;
+  loginView();
+  if(mode === 'signup') $('#pw').addEventListener('input',updatePasswordRules);
+}
+
+function passwordChecks(password){
+  return {
+    length:password.length >= 8,
+    upper:/[A-Z]/.test(password),
+    lower:/[a-z]/.test(password),
+    number:/[0-9]/.test(password),
+    special:/[^A-Za-z0-9\s]/.test(password)
+  };
+}
+
+function updatePasswordRules(){
+  const checks = passwordChecks($('#pw')?.value || '');
+  for(const [rule,ok] of Object.entries(checks)){
+    const item = document.querySelector(`[data-rule="${rule}"]`);
+    if(item){ item.style.color = ok ? 'var(--g)' : 'var(--mut)'; item.style.fontWeight = ok ? '700' : '400'; }
+  }
+}
+
+function togglePassword(id,button){
+  const input = $('#' + id);
+  const showing = input.type === 'password';
+  input.type = showing ? 'text' : 'password';
+  button.textContent = showing ? 'Ocultar senha' : (id === 'pw_confirm' ? 'Mostrar confirmação' : 'Mostrar senha');
+}
+
+function passwordRecoveryView(){
+  $('#app').innerHTML = `<div id="login"><h2>Redefinir senha</h2>
+    <label for="new_pw">Nova senha</label><input id="new_pw" type="password" autocomplete="new-password" oninput="updateRecoveryRules()">
+    <button type="button" class="alt" onclick="togglePassword('new_pw',this)">Mostrar senha</button>
+    <ul class="m" id="password-rules"><li data-rule="length">Pelo menos 8 caracteres</li><li data-rule="upper">Uma letra maiúscula</li><li data-rule="lower">Uma letra minúscula</li><li data-rule="number">Um número</li><li data-rule="special">Um caractere especial (ex.: !, @ ou #)</li></ul>
+    <label for="new_pw_confirm">Repita a nova senha</label><input id="new_pw_confirm" type="password" autocomplete="new-password">
+    <button type="button" class="alt" onclick="togglePassword('new_pw_confirm',this)">Mostrar confirmação</button>
+    <p class="open" id="msg"></p><div class="acts"><button onclick="updatePassword()">Salvar nova senha</button></div></div>`;
+}
+
+function updateRecoveryRules(){
+  const checks = passwordChecks($('#new_pw')?.value || '');
+  for(const [rule,ok] of Object.entries(checks)){
+    const item = document.querySelector(`[data-rule="${rule}"]`);
+    if(item){ item.style.color = ok ? 'var(--g)' : 'var(--mut)'; item.style.fontWeight = ok ? '700' : '400'; }
+  }
+}
+
+async function updatePassword(){
+  const password = $('#new_pw').value;
+  const checks = passwordChecks(password);
+  if(Object.values(checks).some(ok => !ok)) return $('#msg').textContent = 'A senha ainda não atende a todos os requisitos.';
+  if(password !== $('#new_pw_confirm').value) return $('#msg').textContent = 'As senhas não coincidem.';
+  const {error} = await db.auth.updateUser({password});
+  if(error) return $('#msg').textContent = error.message;
+  await db.auth.signOut();
+  history.replaceState(null,'',location.pathname + location.search);
+  authMode = 'login';
+  loginView('Senha redefinida. Entre com sua nova senha.');
+}
+
+async function sendPasswordRecovery(){
+  const email = val('em').trim();
+  if(!email) return $('#msg').textContent = 'Informe seu e-mail para receber o link.';
+  const redirectTo = new URL(location.href);
+  redirectTo.search = '';
+  redirectTo.hash = '';
+  const {error} = await db.auth.resetPasswordForEmail(email,{redirectTo:redirectTo.toString()});
+  if(error) return $('#msg').textContent = error.message;
+  $('#msg').textContent = 'Se este e-mail tiver uma conta, enviaremos um link para redefinir a senha. Confira também o spam.';
 }
 
 
@@ -600,9 +706,14 @@ async function login(){
 
 async function signup(){
 
+  const password = val('pw');
+  const checks = passwordChecks(password);
+  if(Object.values(checks).some(ok => !ok)) return $('#msg').textContent = 'A senha precisa atender a todos os requisitos mostrados.';
+  if(password !== val('pw_confirm')) return $('#msg').textContent = 'As senhas não coincidem.';
+
   const r = await db.auth.signUp({
     email:val('em').trim(),
-    password:val('pw')
+    password
   });
 
   if(r.error){
