@@ -442,6 +442,15 @@ let googleTokenExpiresAt = 0;
 let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
 
+function accessLevel(){
+  return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
+}
+function canAdd(){ return ['adicionar','total'].includes(accessLevel()); }
+function canManage(){ return accessLevel() === 'total'; }
+function accessLabel(level){
+  return ({visualizar:'Visualizar',adicionar:'Adicionar',total:'Total'})[level] || 'Total';
+}
+
 
 // ===============================
 // LOGIN / INICIALIZAÇÃO
@@ -488,6 +497,8 @@ async function start(){
 
 function loginView(msg){
 
+  const invitedEmail = new URLSearchParams(location.search).get('convite') || '';
+
   $('#app').innerHTML = `
     <div id="login">
 
@@ -497,6 +508,7 @@ function loginView(msg){
       <input
         id="em"
         type="email"
+        value="${esc(invitedEmail)}"
         autocomplete="username"
       >
 
@@ -518,7 +530,7 @@ function loginView(msg){
           class="alt"
           onclick="signup()"
         >
-          Criar conta (com convite)
+          Criar conta com convite
         </button>
       </div>
 
@@ -618,7 +630,7 @@ function render(){
   let h = `
     <header>
       <b>${esc(acc.name)}</b>
-      <button class="lime" onclick="openBooking()">Nova reserva</button>
+      ${canAdd() ? '<button class="lime" onclick="openBooking()">Nova reserva</button>' : ''}
       ${me.role === 'owner' ? `
         <button class="alt" onclick="openConfig()">Equipe</button>
         <button class="alt" onclick="openItineraries()">Itinerários</button>
@@ -843,8 +855,7 @@ async function openBooking(id){
 
   const locked =
     id &&
-    b.status !== 'aberta' &&
-    me.role !== 'owner';
+    !canManage();
 
   const dis =
     locked ? 'disabled' : '';
@@ -1284,7 +1295,7 @@ async function openBooking(id){
 
 
             ${
-              me.role === 'owner' && !p.voided
+              canManage() && !p.voided
 
               ? `
                 <button
@@ -1313,7 +1324,7 @@ async function openBooking(id){
       `;
 
 
-    if(b.status === 'aberta'){
+    if(b.status === 'aberta' && canAdd()){
 
       h += `
 
@@ -1465,9 +1476,9 @@ async function openBooking(id){
     h += '<div class="acts">';
 
 
-    if(b.status === 'aberta'){
+    if(b.status === 'aberta' && canManage()){
 
-      if(me.role === 'owner'){
+      if(canManage()){
 
         h += `
           <button
@@ -1478,16 +1489,11 @@ async function openBooking(id){
         `;
       }
 
-      h += `
-        <button
-          class="bad"
-          onclick="setStatus('${id}','cancelada')"
-        >
-          Cancelar reserva
-        </button>
+      if(canManage()) h += `
+        <button class="bad" onclick="setStatus('${id}','cancelada')">Cancelar reserva</button>
       `;
 
-    }else if(me.role === 'owner'){
+    }else if(canManage()){
 
       h += `
         <button
@@ -1499,7 +1505,7 @@ async function openBooking(id){
       `;
     }
 
-    if(me.role === 'owner'){
+    if(canManage()){
       h += `<button class="bad" onclick="deleteBooking('${id}')">Excluir reserva</button>`;
     }
 
@@ -1578,6 +1584,9 @@ function addScheduleItem(){
 
 
 async function saveBooking(id,sendEmail=false){
+
+  if(id && !canManage()) return alert('Seu nível de acesso não permite editar reservas existentes.');
+  if(!id && !canAdd()) return alert('Seu nível de acesso não permite criar reservas.');
 
   const v = {
     client_name:val('c_name').trim(),
@@ -1711,7 +1720,7 @@ async function saveBooking(id,sendEmail=false){
 }
 
 async function deleteBooking(id){
-  if(me.role !== 'owner') return alert('Somente o responsável da conta pode excluir reservas.');
+  if(!canManage()) return alert('Seu nível de acesso não permite excluir reservas.');
   const booking = bookings.find(item => item.id === id);
   if(Object.keys(booking?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())) return alert('Esta reserva tem evento no Google Agenda. Abra Equipe e conecte o Google antes de excluir, para remover o evento também.');
   if(!confirm(`Excluir a reserva ${booking?.booking_code || ''}? Ela sairá da agenda e será ocultada, mas ficará preservada no banco.`)) return;
@@ -1731,6 +1740,8 @@ async function deleteBooking(id){
 // ===============================
 
 async function addPay(bid){
+
+  if(!canAdd()) return alert('Seu nível de acesso não permite adicionar pagamentos.');
 
   const amount =
     Number(val('p_amt'));
@@ -1808,6 +1819,8 @@ async function addPay(bid){
 
 async function voidPay(pid,bid){
 
+  if(!canManage()) return alert('Seu nível de acesso não permite estornar pagamentos.');
+
   if(
     !confirm(
       'Estornar este pagamento?'
@@ -1843,6 +1856,8 @@ async function voidPay(pid,bid){
 // ===============================
 
 async function setStatus(id,s){
+
+  if(!canManage()) return alert('Seu nível de acesso não permite alterar o status da reserva.');
 
   const before=bookings.find(item => item.id === id);
   if(s === 'cancelada' && Object.keys(before?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())){
@@ -1890,6 +1905,7 @@ async function setStatus(id,s){
 // ===============================
 
 async function sendBookingVoucher(id){
+  if(!canAdd()) return alert('Seu nível de acesso não permite enviar o voucher ao cliente.');
   const {error} = await db.functions.invoke('send-booking-voucher',{
     body:{booking_id:id}
   });
@@ -2241,12 +2257,8 @@ async function saveItinerary(){
 
 async function openConfig(){
 
-  const inv =
-    (
-      await db
-        .from('invites')
-        .select('*')
-    ).data || [];
+  const invResult = await db.from('invites').select('*').eq('account_id',acc.id).is('accepted_at',null);
+  const inv = invResult.data || [];
 
 
   $('#dlg').innerHTML = `
@@ -2284,6 +2296,7 @@ async function openConfig(){
               ${esc(m.name)}
               ·
               ${esc(m.email)}
+              ${m.role === 'owner' ? '' : ` · ${esc(m.department || 'Equipe')} · ${esc(accessLabel(m.access_level))}`}
 
             </span>
 
@@ -2313,9 +2326,8 @@ async function openConfig(){
             ${esc(i.email)}
           </span>
 
-            <span class="m">
-            convite pendente
-              </span>
+            <span class="m">${esc(i.department || 'Equipe')} · ${esc(accessLabel(i.access_level))} · pendente</span>
+            <button class="alt" onclick="resendTeamInvitation('${encodeURIComponent(i.email)}')">Reenviar</button>
 
         </div>
 
@@ -2323,31 +2335,24 @@ async function openConfig(){
     }
 
 
-    <label for="i_em">
-      Convidar por e-mail
-    </label>
-
-    <div class="row">
-
-      <input
-        id="i_em"
-        type="email"
-      >
-
-      <button
-        onclick="invite()"
-        style="flex:0 0 auto"
-      >
-        Convidar
-      </button>
-
-    </div>
-
-
-    <div class="m">
-      A pessoa usa “Criar conta”
-      com esse mesmo e-mail.
-    </div>
+    <h3>Convidar colaborador</h3>
+    <label for="i_em">E-mail do colaborador</label>
+    <input id="i_em" type="email" placeholder="nome@exemplo.com">
+    <label for="i_department">Função / área</label>
+    <select id="i_department">
+      <option value="Contador">Contador</option>
+      <option value="Atendimento">Atendimento</option>
+      <option value="Vendas">Vendas</option>
+      <option value="Outra">Outra</option>
+    </select>
+    <label for="i_access">O que poderá fazer no app?</label>
+    <select id="i_access">
+      <option value="visualizar">Visualizar — consultar informações</option>
+      <option value="adicionar">Adicionar — consultar e criar reservas/pagamentos</option>
+      <option value="total">Total — acesso completo às operações</option>
+    </select>
+    <p class="m">O convite será enviado por e-mail. A pessoa acessa o app, informa este e-mail e cria a própria senha. Nenhum voucher será enviado ao colaborador.</p>
+    <div class="acts"><button onclick="invite()">Enviar convite por e-mail</button></div>
 
 
     <h3>
@@ -2421,30 +2426,49 @@ async function invite(){
       .toLowerCase();
 
 
-  if(!email) return;
+  if(me.role !== 'owner') return alert('Somente o responsável pode convidar pessoas.');
+  const department = val('i_department');
+  const access_level = val('i_access');
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return alert('Informe um e-mail válido.');
+  if(teamEmailExists(email)) return alert('Este e-mail já tem acesso ao app.');
 
-
-  const r =
-    await db
-      .from('invites')
-      .insert({
-
-        email,
-
-        account_id:acc.id,
-
-        role:'staff'
-
-      });
-
-
-  if(r.error){
-
-    return alert(r.error.message);
+  const pending = await db.from('invites').select('email').eq('account_id',acc.id).ilike('email',email).is('accepted_at',null).limit(1).maybeSingle();
+  let saved;
+  if(pending.data){
+    saved = await db.from('invites').update({department,access_level}).eq('account_id',acc.id).ilike('email',email).is('accepted_at',null);
+  }else{
+    saved = await db.from('invites').insert({email,account_id:acc.id,role:'staff',department,access_level});
   }
-
-
+  if(saved.error) return alert('Não foi possível registrar o convite: ' + saved.error.message);
+  const result = await sendTeamInvitation(email,department,access_level);
+  if(result.error) return alert('O convite ficou salvo, mas o e-mail não foi enviado: ' + result.error);
+  alert('Convite enviado para ' + email + '. A pessoa deverá criar a conta usando esse mesmo e-mail.');
   openConfig();
+}
+
+async function sendTeamInvitation(email,department,access_level){
+  const inviteUrl = new URL(location.href);
+  inviteUrl.searchParams.set('convite',email);
+  inviteUrl.hash = '';
+  const sent = await db.functions.invoke('send-team-invitation',{
+    body:{email,account_id:acc.id,department,access_level,app_url:inviteUrl.toString()}
+  });
+  if(sent.error || sent.data?.error) return {error:sent.data?.error || sent.error?.message || 'Confira a função send-team-invitation no Supabase.'};
+  return {error:''};
+}
+
+async function resendTeamInvitation(encodedEmail){
+  const email = decodeURIComponent(encodedEmail);
+  const invite = await db.from('invites').select('email,department,access_level').eq('account_id',acc.id).ilike('email',email).is('accepted_at',null).limit(1).maybeSingle();
+  if(invite.error || !invite.data) return alert('Convite pendente não encontrado. Atualize a aba Equipe.');
+  const result = await sendTeamInvitation(invite.data.email,invite.data.department,invite.data.access_level);
+  if(result.error) return alert('Não foi possível reenviar: ' + result.error);
+  alert('Convite reenviado para ' + email + '.');
+}
+
+function teamEmailExists(email){
+  const normalized = email.trim().toLowerCase();
+  return Object.values(team).some(member => String(member.email || '').trim().toLowerCase() === normalized);
 }
 
 
