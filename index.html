@@ -236,6 +236,40 @@ h3{
   gap:8px;
   margin-top:14px
 }
+
+.summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 14px
+}
+
+.summary-card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px
+}
+
+.summary-card span{
+  display:block;
+  color:var(--mut);
+  font-size:13px
+}
+
+.summary-card strong{
+  display:block;
+  color:var(--g);
+  font-size:20px;
+  margin-top:3px;
+  overflow-wrap:anywhere
+}
+
+@media(max-width:520px){
+  .summary{grid-template-columns:1fr}
+  .summary-card{padding:10px 12px}
+  .summary-card strong{font-size:19px}
+}
 </style>
 </head>
 
@@ -337,6 +371,7 @@ let me;
 let acc;
 let team = {};
 let bookings = [];
+let summaryBookings = [];
 let week = monday(new Date());
 
 
@@ -488,18 +523,33 @@ async function logout(){
 
 async function load(){
 
-  const r = await db
-    .from('bookings')
-    .select('*, payments(*)')
-    .gte('tour_date',iso(week))
-    .lte(
-      'tour_date',
-      iso(addDays(week,6))
-    )
-    .order('tour_date')
-    .order('tour_time');
+  const [weekResult, summaryResult] = await Promise.all([
+    db
+      .from('bookings')
+      .select('*, payments(*)')
+      .gte('tour_date',iso(week))
+      .lte(
+        'tour_date',
+        iso(addDays(week,6))
+      )
+      .order('tour_date')
+      .order('tour_time'),
+    db
+      .from('bookings')
+      .select('*, payments(*)')
+      .order('tour_date')
+  ]);
 
-  bookings = r.data || [];
+  if(weekResult.error){
+    return alert('Não foi possível carregar a agenda: ' + weekResult.error.message);
+  }
+
+  if(summaryResult.error){
+    return alert('Não foi possível carregar o resumo: ' + summaryResult.error.message);
+  }
+
+  bookings = weekResult.data || [];
+  summaryBookings = summaryResult.data || [];
 
   render();
 }
@@ -567,6 +617,8 @@ function render(){
     </header>
 
     <main>
+
+      ${summaryView()}
 
       <div class="nav">
 
@@ -688,6 +740,41 @@ function render(){
 
   $('#app').innerHTML =
     h + '</main>';
+}
+
+
+function summaryView(){
+
+  // Reservas canceladas ficam fora dos indicadores financeiros e da contagem.
+  const active =
+    summaryBookings.filter(b => b.status !== 'cancelada');
+
+  const totalReservations =
+    active.reduce((sum,b) => sum + Number(b.total || 0),0);
+
+  const totalDeposits =
+    active.reduce((sum,b) =>
+      sum + (b.payments || [])
+        .filter(p => !p.voided && p.payment_type === 'sinal')
+        .reduce((paidSum,p) => paidSum + Number(p.amount || 0),0)
+    ,0);
+
+  return `
+    <section class="summary" aria-label="Resumo de reservas">
+      <div class="summary-card">
+        <span>Reservas ativas</span>
+        <strong>${active.length}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Valor total das reservas</span>
+        <strong>${brl(totalReservations)}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Sinais pagos</span>
+        <strong>${brl(totalDeposits)}</strong>
+      </div>
+    </section>
+  `;
 }
 
 
