@@ -1,123 +1,2489 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Reservas</title>
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+:root{
+  --g:#0f3d2e;
+  --l:#b6e14a;
+  --bg:#f5f6f2;
+  --ink:#17201b;
+  --mut:#66726b;
+  --line:#dde2db;
+  --red:#a4332b;
+  box-sizing:border-box
 }
 
-const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-}[c]!))
+*{box-sizing:inherit}
 
-const brl = (value: unknown) => Number(value || 0).toLocaleString('pt-BR', {
-  style: 'currency', currency: 'BRL',
-})
-
-const dateBR = (value: string) => {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,sans-serif;
+  padding-bottom:env(safe-area-inset-bottom)
 }
 
-Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+header{
+  background:var(--g);
+  color:#fff;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  position:sticky;
+  top:0;
+  z-index:5
+}
+
+header b{
+  flex:1;
+  font-size:18px
+}
+
+button{
+  font:inherit;
+  border:0;
+  border-radius:8px;
+  padding:9px 14px;
+  background:var(--g);
+  color:#fff;
+  cursor:pointer
+}
+
+button.alt{
+  background:#fff;
+  color:var(--g);
+  border:1px solid var(--line)
+}
+
+button.lime{
+  background:var(--l);
+  color:var(--g);
+  font-weight:600
+}
+
+button.bad{
+  background:#fff;
+  color:var(--red);
+  border:1px solid var(--red)
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible{
+  outline:3px solid var(--l);
+  outline-offset:1px
+}
+
+main{
+  max-width:760px;
+  margin:0 auto;
+  padding:14px
+}
+
+input,
+select,
+textarea{
+  font:inherit;
+  width:100%;
+  padding:9px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff
+}
+
+label{
+  display:block;
+  font-size:14px;
+  color:var(--mut);
+  margin:10px 0 3px
+}
+
+.row{
+  display:flex;
+  gap:10px
+}
+
+.row>*{
+  flex:1;
+  min-width:0
+}
+
+.nav{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px
+}
+
+.nav b{
+  flex:1;
+  text-align:center
+}
+
+.day{
+  margin:16px 0 6px;
+  font-weight:700;
+  color:var(--g)
+}
+
+.card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px;
+  margin-bottom:8px;
+  cursor:pointer
+}
+
+.card.cancelada{
+  opacity:.55
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  gap:8px
+}
+
+.m{
+  color:var(--mut);
+  font-size:14px
+}
+
+.tag{
+  font-size:13px;
+  padding:2px 8px;
+  border-radius:99px;
+  background:#e8eee6
+}
+
+.tag.finalizada{
+  background:var(--l);
+  color:var(--g)
+}
+
+.tag.cancelada{
+  background:#f3dcd9;
+  color:var(--red)
+}
+
+.open{
+  color:var(--red);
+  font-weight:600
+}
+
+.ok{
+  color:var(--g);
+  font-weight:600
+}
+
+dialog{
+  border:0;
+  border-radius:12px;
+  max-width:560px;
+  width:calc(100% - 20px);
+  padding:16px;
+  max-height:92vh;
+  overflow:auto
+}
+
+dialog::backdrop{
+  background:#0008
+}
+
+h3{
+  margin:14px 0 6px
+}
+
+.line{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:6px 0;
+  border-bottom:1px solid var(--line);
+  font-size:14px
+}
+
+.void{
+  text-decoration:line-through;
+  color:var(--mut)
+}
+
+.empty{
+  text-align:center;
+  color:var(--mut);
+  padding:30px 10px
+}
+
+#login{
+  max-width:360px;
+  margin:12vh auto;
+  padding:20px
+}
+
+.acts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px
+}
+
+.summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 14px
+}
+
+.summary-card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px
+}
+
+.summary-card span{
+  display:block;
+  color:var(--mut);
+  font-size:13px
+}
+
+.summary-card strong{
+  display:block;
+  color:var(--g);
+  font-size:20px;
+  margin-top:3px;
+  overflow-wrap:anywhere
+}
+
+@media(max-width:520px){
+  .summary{grid-template-columns:1fr}
+  .summary-card{padding:10px 12px}
+  .summary-card strong{font-size:19px}
+}
+
+.calendar{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px;
+  margin-bottom:18px
+}
+
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:4px
+}
+
+.calendar-weekday{
+  text-align:center;
+  color:var(--mut);
+  font-size:12px;
+  font-weight:600;
+  padding:5px 0
+}
+
+.calendar-day{
+  min-height:62px;
+  padding:6px 2px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:#f5f6f2;
+  color:var(--ink);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:3px
+}
+
+.calendar-day:hover{border-color:var(--g)}
+.calendar-day.selected{background:var(--g);color:#fff}
+.calendar-day.today{border-color:var(--l);border-width:2px}
+.calendar-day small{font-size:10px;line-height:1.1;color:inherit}
+.calendar-day.empty-day{visibility:hidden}
+
+@media(max-width:520px){
+  .calendar{padding:6px}
+  .calendar-grid{gap:2px}
+  .calendar-day{min-height:48px;padding:5px 0;font-size:14px}
+  .calendar-day small{font-size:9px}
+}
+</style>
+</head>
+
+<body>
+
+<div id="app"></div>
+
+<dialog id="dlg"></dialog>
+
+<script>
+
+// ===============================
+// SUPABASE
+// ===============================
+
+const SUPABASE_URL = 'https://ewhfabhktkvrjddnvgkl.supabase.co';
+
+// Mantenha aqui a sua chave atual do Supabase
+const SUPABASE_KEY = 'sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU';
+
+const db = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+
+// ===============================
+// FUNÇÕES AUXILIARES
+// ===============================
+
+const $ = s => document.querySelector(s);
+
+const esc = s =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[c])
+  );
+
+const brl = n =>
+  Number(n || 0).toLocaleString('pt-BR',{
+    style:'currency',
+    currency:'BRL'
+  });
+
+const iso = d =>
+  d.getFullYear() +
+  '-' +
+  String(d.getMonth()+1).padStart(2,'0') +
+  '-' +
+  String(d.getDate()).padStart(2,'0');
+
+const addDays = (d,n) => {
+  const x = new Date(d);
+  x.setDate(x.getDate()+n);
+  return x;
+};
+
+const monday = d => {
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  x.setDate(x.getDate()-((x.getDay()+6)%7));
+  return x;
+};
+
+const dBR = s =>
+  s ? s.split('-').reverse().join('/') : '';
+
+const dtBR = s =>
+  s
+    ? new Date(s).toLocaleString('pt-BR',{
+        dateStyle:'short',
+        timeStyle:'short'
+      })
+    : '';
+
+const paid = b =>
+  (b.payments || [])
+    .filter(p => !p.voided)
+    .reduce((s,p) => s + Number(p.amount),0);
+
+const nm = id =>
+  (team[id] && team[id].name) || '—';
+
+const val = id =>
+  $('#' + id).value;
+
+
+// ===============================
+// ESTADO
+// ===============================
+
+let me;
+let acc;
+let team = {};
+let bookings = [];
+let summaryBookings = [];
+let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let selectedDate = iso(new Date());
+
+
+// ===============================
+// LOGIN / INICIALIZAÇÃO
+// ===============================
+
+async function start(){
+
+  const {
+    data:{session}
+  } = await db.auth.getSession();
+
+  if(!session){
+    return loginView();
   }
 
-  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  const m = await db
+    .from('members')
+    .select('*');
 
-  if (request.method !== 'POST') return json({ error: 'Método não permitido.' }, 405)
+  team = Object.fromEntries(
+    (m.data || []).map(x => [x.user_id,x])
+  );
 
-  try {
-    const authorization = request.headers.get('Authorization')
-    if (!authorization) return json({ error: 'Faça login para enviar o voucher.' }, 401)
+  me = team[session.user.id];
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const publishableKeys = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}')
-    const publishableKey = publishableKeys.default
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL')
-    if (!supabaseUrl || !publishableKey || !resendKey || !fromEmail) {
-      return json({ error: 'Configure SUPABASE, RESEND_API_KEY e RESEND_FROM_EMAIL na função.' }, 500)
-    }
+  if(!me){
+    await db.auth.signOut();
 
-    const supabase = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authorization } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    return loginView(
+      'Este e-mail não tem acesso. Peça um convite ao dono.'
+    );
+  }
 
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    if (userError || !userData.user) return json({ error: 'Sessão inválida.' }, 401)
-
-    const body = await request.json()
-    const bookingId = String(body?.booking_id || '')
-    if (!bookingId) return json({ error: 'Reserva não informada.' }, 400)
-
-    const { data: booking, error: bookingError } = await supabase
-      .from('bookings')
-      .select('*, payments(*)')
-      .eq('id', bookingId)
-      .single()
-    if (bookingError || !booking) return json({ error: 'Reserva não encontrada ou sem acesso.' }, 404)
-
-    const { data: account, error: accountError } = await supabase
+  acc = (
+    await db
       .from('accounts')
       .select('*')
-      .eq('id', booking.account_id)
       .single()
-    if (accountError || !account) return json({ error: 'Dados da conta não encontrados.' }, 404)
+  ).data;
 
-    const to = String(booking.client_email || '').trim()
-    if (!to) return json({ error: 'A reserva não tem e-mail do cliente.' }, 400)
+  await load();
+}
 
-    const payments = (booking.payments || []).filter((payment: { voided?: boolean }) => !payment.voided)
-    const paid = payments.reduce((sum: number, payment: { amount?: number }) => sum + Number(payment.amount || 0), 0)
-    const open = Math.max(0, Number(booking.total || 0) - paid)
-    const policy = String(account.cancel_policy || 'Entre em contato para consultar a política de cancelamento.')
-    const customerMessage = String(booking.client_message || '')
-    const time = String(booking.tour_time || '').slice(0, 5)
-    const code = String(booking.booking_code || booking.id)
-    const review = account.review_url
-      ? `<p>Depois do passeio, conte como foi: <a href="${escapeHtml(account.review_url)}">deixar avaliação</a>.</p>`
+
+function loginView(msg){
+
+  $('#app').innerHTML = `
+    <div id="login">
+
+      <h2>Reservas</h2>
+
+      <label for="em">E-mail</label>
+      <input
+        id="em"
+        type="email"
+        autocomplete="username"
+      >
+
+      <label for="pw">Senha</label>
+      <input
+        id="pw"
+        type="password"
+        autocomplete="current-password"
+      >
+
+      <p class="open" id="msg">
+        ${esc(msg || '')}
+      </p>
+
+      <div class="acts">
+        <button onclick="login()">Entrar</button>
+
+        <button
+          class="alt"
+          onclick="signup()"
+        >
+          Criar conta (com convite)
+        </button>
+      </div>
+
+    </div>
+  `;
+}
+
+
+async function login(){
+
+  const email = val('em').trim();
+  const password = val('pw');
+
+  if(!email || !password){
+    return $('#msg').textContent =
+      'Informe o e-mail e a senha.';
+  }
+
+  const r = await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(r.error){
+    console.error(r.error);
+
+    return $('#msg').textContent =
+      r.error.message;
+  }
+
+  await start();
+}
+
+
+async function signup(){
+
+  const r = await db.auth.signUp({
+    email:val('em').trim(),
+    password:val('pw')
+  });
+
+  if(r.error){
+
+    return $('#msg').textContent =
+      r.error.message.includes('convite')
+        ? 'Este e-mail não foi convidado.'
+        : r.error.message;
+  }
+
+  $('#msg').textContent =
+    'Conta criada. Se pedir, confirme o e-mail e entre.';
+
+  if(r.data.session){
+    start();
+  }
+}
+
+
+async function logout(){
+
+  await db.auth.signOut();
+
+  loginView();
+}
+
+
+// ===============================
+// CARREGAR RESERVAS
+// ===============================
+
+async function load(){
+
+  const r = await db
+    .from('bookings')
+    .select('*, payments(*)')
+    .order('tour_date')
+    .order('tour_time');
+
+  if(r.error){
+    return alert('Não foi possível carregar as reservas: ' + r.error.message);
+  }
+
+  bookings = r.data || [];
+  summaryBookings = bookings;
+
+  render();
+}
+
+
+// ===============================
+// AGENDA
+// ===============================
+
+function render(){
+
+  let h = `
+    <header>
+      <b>${esc(acc.name)}</b>
+      <button class="lime" onclick="openBooking()">Nova reserva</button>
+      ${me.role === 'owner' ? `
+        <button class="alt" onclick="openConfig()">Equipe</button>
+        <button class="alt" onclick="openItineraries()">Itinerários</button>
+      ` : ''}
+      <button class="alt" onclick="logout()">Sair</button>
+    </header>
+
+    <main>
+      ${summaryView()}
+      ${calendarView()}
+      ${dayBookingsView()}
+    </main>
+  `;
+
+  $('#app').innerHTML = h;
+}
+
+
+function calendarView(){
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstWeekday = (new Date(year,month,1).getDay()+6)%7;
+  const daysInMonth = new Date(year,month+1,0).getDate();
+  const monthName = calendarMonth.toLocaleDateString('pt-BR',{
+    month:'long',year:'numeric'
+  });
+  const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+
+  let cells = weekdays.map(name =>
+    `<div class="calendar-weekday">${name}</div>`
+  ).join('');
+
+  for(let i=0;i<firstWeekday;i++){
+    cells += '<div class="calendar-day empty-day" aria-hidden="true"></div>';
+  }
+
+  for(let day=1;day<=daysInMonth;day++){
+    const date = iso(new Date(year,month,day));
+    const count = summaryBookings.filter(b =>
+      b.tour_date === date && b.status !== 'cancelada'
+    ).length;
+    const selected = date === selectedDate;
+    const today = date === iso(new Date());
+    const fullDate = new Date(year,month,day).toLocaleDateString('pt-BR',{
+      weekday:'long',day:'numeric',month:'long',year:'numeric'
+    });
+
+    cells += `
+      <button
+        class="calendar-day ${selected ? 'selected' : ''} ${today ? 'today' : ''}"
+        aria-label="${esc(fullDate)}${count ? ', ' + count + ' reservas' : ''}"
+        aria-pressed="${selected}"
+        onclick="selectDate('${date}')"
+      >
+        <span>${day}</span>
+        ${count ? `<small>${count} ${count === 1 ? 'reserva' : 'reservas'}</small>` : ''}
+      </button>
+    `;
+  }
+
+  return `
+    <section aria-label="Agenda mensal">
+      <div class="nav">
+        <button class="alt" aria-label="Mês anterior" onclick="changeMonth(-1)">‹</button>
+        <b style="text-transform:capitalize">${esc(monthName)}</b>
+        <button class="alt" aria-label="Próximo mês" onclick="changeMonth(1)">›</button>
+        <button class="alt" onclick="goToday()">Hoje</button>
+      </div>
+      <div class="calendar">
+        <div class="calendar-grid">${cells}</div>
+      </div>
+    </section>
+  `;
+}
+
+
+function dayBookingsView(){
+
+  const [year,month,day] = selectedDate.split('-').map(Number);
+  const date = new Date(year,month-1,day);
+  const fullDate = date.toLocaleDateString('pt-BR',{
+    weekday:'long',day:'numeric',month:'long',year:'numeric'
+  });
+  const list = summaryBookings
+    .filter(b => b.tour_date === selectedDate)
+    .sort((a,b) => (a.tour_time || '').localeCompare(b.tour_time || ''));
+
+  let h = `<h2 style="text-transform:capitalize">${esc(fullDate)}</h2>`;
+
+  if(!list.length){
+    return h + '<div class="empty">Nenhum serviço agendado para este dia.</div>';
+  }
+
+  for(const b of list){
+    const open = Number(b.total) - paid(b);
+    h += `
+      <div class="card ${b.status}" onclick="openBooking('${b.id}')">
+        <div class="top">
+          <b>${esc((b.tour_time || '').slice(0,5))} ${esc(b.client_name)}</b>
+          <span class="tag ${b.status}">${esc(b.status)}</span>
+        </div>
+        <div class="m"><b>${esc(b.booking_code || 'Sem código')}</b></div>
+        <div class="m">${esc(b.itinerary || 'Sem roteiro')} · ${b.pax} pessoa(s)</div>
+        <div class="m">
+          Total ${brl(b.total)} · Pago ${brl(paid(b))} ·
+          <span class="${open > 0 ? 'open' : 'ok'}">
+            ${open > 0 ? 'Em aberto ' + brl(open) : 'Quitado'}
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
+  return h;
+}
+
+
+function selectDate(date){
+  selectedDate = date;
+  const [year,month] = date.split('-').map(Number);
+  calendarMonth = new Date(year,month-1,1);
+  render();
+}
+
+
+function changeMonth(amount){
+  calendarMonth = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth()+amount,
+    1
+  );
+  render();
+}
+
+
+function goToday(){
+  const today = new Date();
+  selectedDate = iso(today);
+  calendarMonth = new Date(today.getFullYear(),today.getMonth(),1);
+  render();
+}
+
+
+function summaryView(){
+
+  // Reservas canceladas ficam fora dos indicadores financeiros e da contagem.
+  const active =
+    summaryBookings.filter(b => b.status !== 'cancelada');
+
+  const totalReservations =
+    active.reduce((sum,b) => sum + Number(b.total || 0),0);
+
+  const totalDeposits =
+    active.reduce((sum,b) =>
+      sum + (b.payments || [])
+        .filter(p => !p.voided && p.payment_type === 'sinal')
+        .reduce((paidSum,p) => paidSum + Number(p.amount || 0),0)
+    ,0);
+
+  return `
+    <section class="summary" aria-label="Resumo de reservas">
+      <div class="summary-card">
+        <span>Reservas ativas</span>
+        <strong>${active.length}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Valor total das reservas</span>
+        <strong>${brl(totalReservations)}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Sinais pagos</span>
+        <strong>${brl(totalDeposits)}</strong>
+      </div>
+    </section>
+  `;
+}
+
+
+// ===============================
+// ABRIR RESERVA
+// ===============================
+
+async function openBooking(id){
+
+  const b = id
+    ? bookings.find(x => x.id === id)
+    : {
+        status:'aberta',
+        pax:1,
+        total:0,
+        tour_date:selectedDate,
+        payments:[]
+      };
+
+
+  // Carrega itinerários
+  const ir = await db
+    .from('itineraries')
+    .select('*')
+    .eq('account_id',acc.id)
+    .eq('active',true)
+    .order('name');
+
+  const itineraries =
+    ir.data || [];
+
+
+  const locked =
+    id &&
+    b.status !== 'aberta' &&
+    me.role !== 'owner';
+
+  const dis =
+    locked ? 'disabled' : '';
+
+
+  let hist = [];
+
+  if(id){
+
+    hist =
+      (
+        await db
+          .from('audit_log')
+          .select('*')
+          .eq('booking_id',id)
+          .order('at',{
+            ascending:false
+          })
+      ).data || [];
+  }
+
+
+  const pays =
+    b.payments || [];
+
+
+  let h = `
+
+    <form
+      method="dialog"
+      style="text-align:right"
+    >
+      <button class="alt">
+        Fechar
+      </button>
+    </form>
+
+    <h2 style="margin:0">
+
+      ${id ? 'Reserva' : 'Nova reserva'}
+
+      ${
+        id
+        ? `
+          <span class="tag ${b.status}">
+            ${b.status}
+          </span>
+        `
+        : ''
+      }
+
+    </h2>
+
+    ${
+      id && b.booking_code
+      ? `
+        <div
+          class="m"
+          style="margin-top:6px"
+        >
+          <b>Código:</b>
+          ${esc(b.booking_code)}
+        </div>
+      `
       : ''
-
-    const html = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><body style="font:16px/1.55 system-ui,-apple-system,sans-serif;color:#17201b;max-width:640px;margin:24px auto;padding:0 16px">
-      <h1 style="color:#0f3d2e;margin-bottom:0">${escapeHtml(account.name)}</h1>
-      <p style="margin-top:0">Confirmação da sua reserva</p><hr>
-      <p>Olá, ${escapeHtml(booking.client_name)}! Sua reserva está confirmada.</p>
-      <p><b>Código:</b> ${escapeHtml(code)}<br><b>Data:</b> ${escapeHtml(dateBR(booking.tour_date))} ${escapeHtml(time)}<br><b>Roteiro:</b> ${escapeHtml(booking.itinerary)}<br><b>Pessoas:</b> ${escapeHtml(booking.pax)}<br><b>Ingresso:</b> ${booking.ticket_included ? 'incluso' : 'não incluso'}</p>
-      <p><b>Valor total:</b> ${brl(booking.total)}<br><b>Pago:</b> ${brl(paid)}<br><b>Em aberto:</b> ${brl(open)}</p>
-      ${customerMessage ? `<h2>Informações para você</h2><p style="white-space:pre-wrap">${escapeHtml(customerMessage)}</p>` : ''}
-      <h2>Política de cancelamento</h2><p style="white-space:pre-wrap">${escapeHtml(policy)}</p>
-      ${review}
-    </body></html>`
-
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [to],
-        subject: `Confirmação da sua reserva ${code} - ${account.name}`,
-        html,
-      }),
-    })
-
-    const emailResult = await emailResponse.json()
-    if (!emailResponse.ok) {
-      console.error('Falha ao enviar voucher pelo provedor de e-mail.')
-      return json({ error: 'O provedor recusou o envio do e-mail.' }, 502)
     }
 
-    return json({ ok: true, id: emailResult.id })
-  } catch (error) {
-    console.error('Falha ao processar envio de voucher.', error)
-    return json({ error: 'Não foi possível enviar o voucher.' }, 500)
+    ${
+      id
+      ? `
+        <div class="m">
+
+          Criada por
+          ${esc(nm(b.created_by))}
+
+          em
+          ${dtBR(b.created_at)}
+
+          ${
+            b.finalized_by
+            ? `
+              · Finalizada por
+              ${esc(nm(b.finalized_by))}
+              em
+              ${dtBR(b.finalized_at)}
+            `
+            : ''
+          }
+
+        </div>
+      `
+      : ''
+    }
+
+
+    <h3>Dados do cliente</h3>
+
+    <label for="c_name">
+      Nome completo
+    </label>
+
+    <input
+      id="c_name"
+      value="${esc(b.client_name)}"
+      ${dis}
+    >
+
+
+    <label for="c_doc">
+      Documento de identificação
+    </label>
+
+    <input
+      id="c_doc"
+      value="${esc(b.client_document)}"
+      placeholder="CPF, RG ou passaporte"
+      ${dis}
+    >
+
+    <label for="c_email">
+      E-mail para receber a confirmação
+    </label>
+
+    <input
+      id="c_email"
+      type="email"
+      value="${esc(b.client_email)}"
+      ${dis}
+    >
+
+    <label for="c_tel">
+      WhatsApp (opcional)
+    </label>
+
+    <input
+      id="c_tel"
+      value="${esc(b.client_phone)}"
+      inputmode="tel"
+      ${dis}
+    >
+
+
+    <div class="row">
+
+      <div>
+
+        <label for="c_dt">
+          Data
+        </label>
+
+        <input
+          id="c_dt"
+          type="date"
+          value="${b.tour_date}"
+          ${dis}
+        >
+
+      </div>
+
+
+      <div>
+
+        <label for="c_hr">
+          Hora
+        </label>
+
+        <input
+  id="c_hr"
+  type="time"
+  value="${(b.tour_time || '').slice(0,5)}"
+>
+
+      </div>
+
+    </div>
+
+
+    <h3>Serviço</h3>
+
+    <label for="c_it">
+      Roteiro
+    </label>
+
+    <select
+      id="c_it"
+      ${dis}
+      onchange="applyItineraryPrice()"
+    >
+
+      <option value="">
+        Selecione um itinerário
+      </option>
+
+      ${
+        itineraries.map(i => `
+          <option
+            value="${esc(i.name)}"
+            data-price="${Number(i.price || 0)}"
+            ${
+              b.itinerary === i.name
+              ? 'selected'
+              : ''
+            }
+          >
+            ${esc(i.name)}
+            ·
+            ${brl(i.price)}
+            / pessoa
+          </option>
+        `).join('')
+      }
+
+    </select>
+
+
+    <div class="row">
+
+      <div>
+
+        <label for="c_px">
+          Pessoas
+        </label>
+
+        <input
+          id="c_px"
+          type="number"
+          min="1"
+          value="${b.pax}"
+          ${dis}
+          onchange="applyPaxPrice()"
+        >
+
+      </div>
+
+
+      <div>
+
+        <label for="c_tt">
+          Valor total (R$)
+        </label>
+
+        <input
+          id="c_tt"
+          type="number"
+          step="0.01"
+          min="0"
+          value="${b.total}"
+          ${dis}
+        >
+
+      </div>
+
+    </div>
+
+    ${!id ? `
+      <h3>Valores e sinal pago</h3>
+
+      <label for="c_signal">
+        Valor do sinal pago (R$)
+      </label>
+      <input
+        id="c_signal"
+        type="number"
+        step="0.01"
+        min="0"
+        value="0"
+        oninput="toggleInstallments()"
+      >
+
+      <label for="c_signal_method">Forma de pagamento do sinal</label>
+      <select id="c_signal_method" onchange="toggleInstallments()">
+        <option value="Pix">Pix</option>
+        <option value="Cartão de crédito">Cartão de crédito</option>
+        <option value="Transferência">Transferência</option>
+        <option value="Dinheiro">Dinheiro em espécie</option>
+      </select>
+
+      <div id="signal-installments" style="display:none">
+        <label for="c_signal_installments">Parcelas no cartão de crédito</label>
+        <input id="c_signal_installments" type="number" min="1" step="1" value="1">
+      </div>
+
+      <label for="c_signal_date">Data do pagamento</label>
+      <input id="c_signal_date" type="date" value="${iso(new Date())}">
+    ` : ''}
+
+    <label>
+      <input
+        type="checkbox"
+        id="c_ti"
+        style="width:auto"
+        ${b.ticket_included ? 'checked' : ''}
+        ${dis}
+      >
+
+      Ingresso incluso
+
+    </label>
+
+
+    <label>
+
+      <input
+        type="checkbox"
+        id="c_tb"
+        style="width:auto"
+        ${b.ticket_bought ? 'checked' : ''}
+        ${dis}
+      >
+
+      Ingresso já comprado
+
+    </label>
+
+
+    <h3>Informações do voucher</h3>
+
+    <label for="c_client_message">
+      Informação para o cliente (aparece no voucher)
+    </label>
+    <textarea
+      id="c_client_message"
+      rows="3"
+      placeholder="Ex.: ponto de encontro, o que levar ou instruções importantes"
+      ${dis}
+    >${esc(b.client_message)}</textarea>
+
+    <label for="c_nt">
+      Observações internas (visíveis somente para a equipe)
+    </label>
+    <textarea
+      id="c_nt"
+      rows="3"
+      placeholder="Anotações da equipe sobre esta reserva"
+      ${dis}
+    >${esc(b.notes)}</textarea>
+
+    <div class="acts">
+
+      ${
+        locked
+        ? ''
+        : id
+        ? `
+          <button onclick="saveBooking('${id}',false)">Salvar alterações</button>
+          <button class="lime" onclick="saveBooking('${id}',true)">Salvar e enviar voucher por e-mail</button>
+        `
+        : `
+          <button onclick="saveBooking('',false)">Salvar reserva</button>
+          <button class="lime" onclick="saveBooking('',true)">Salvar e enviar confirmação por e-mail</button>
+        `
+      }
+
+      ${
+        id
+        ? `
+          <button class="alt" onclick="voucher('${id}')">Visualizar voucher</button>
+        `
+        : ''
+      }
+
+    </div>
+  `;
+
+
+  // ===============================
+  // PAGAMENTOS
+  // ===============================
+
+  if(id){
+
+    h += `
+      <h3>
+        Pagamentos
+
+        <span class="m">
+          (pago ${brl(paid(b))}
+          de ${brl(b.total)})
+        </span>
+
+      </h3>
+    `;
+
+
+    h += pays.length
+
+      ? pays.map(p => `
+
+          <div class="line">
+
+            <span
+              class="${p.voided ? 'void' : ''}"
+            >
+
+              ${brl(p.amount)}
+              ·
+              ${esc(p.method)}
+              ·
+              ${esc(
+                p.payment_type === 'sinal'
+                ? 'Sinal'
+                : p.payment_type === 'parcial'
+                ? 'Parcial'
+                : p.payment_type === 'saldo'
+                ? 'Saldo'
+                : 'Total'
+              )}
+
+              ${
+                p.method === 'Cartão de crédito'
+                ? ` · ${Number(p.installments || 1)}x`
+                : ''
+              }
+
+              ·
+              ${dBR(p.paid_at)}
+
+              · por
+              ${esc(nm(p.created_by))}
+
+            </span>
+
+
+            ${
+              me.role === 'owner' && !p.voided
+
+              ? `
+                <button
+                  class="bad"
+                  onclick="voidPay('${p.id}','${id}')"
+                >
+                  Estornar
+                </button>
+              `
+
+              : p.voided
+
+              ? '<span class="m">estornado</span>'
+
+              : ''
+            }
+
+          </div>
+
+        `).join('')
+
+      : `
+        <div class="m">
+          Nenhum pagamento lançado.
+        </div>
+      `;
+
+
+    if(b.status === 'aberta'){
+
+      h += `
+
+        <div
+          class="row"
+          style="margin-top:8px;align-items:end"
+        >
+
+          <div>
+
+            <label for="p_amt">
+              Valor
+            </label>
+
+            <input
+              id="p_amt"
+              type="number"
+              step="0.01"
+              min="0"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label for="p_type">
+              Tipo
+            </label>
+
+            <select id="p_type">
+
+              <option value="sinal">
+                Sinal
+              </option>
+
+              <option value="parcial">
+                Parcial
+              </option>
+
+              <option value="total">
+                Total
+              </option>
+
+              <option value="saldo">
+                Saldo
+              </option>
+
+            </select>
+
+          </div>
+
+
+          <div>
+
+            <label for="p_met">
+              Forma
+            </label>
+
+            <select id="p_met">
+
+              <option value="Pix">
+                Pix
+              </option>
+
+              <option value="Cartão de crédito">
+                Cartão de crédito
+              </option>
+
+              <option value="Cartão de débito">
+                Cartão de débito
+              </option>
+
+              <option value="Transferência">
+                Transferência
+              </option>
+
+              <option value="Dinheiro">
+                Dinheiro
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+        <div class="row">
+
+          <div>
+
+            <label for="p_inst">
+              Parcelas
+            </label>
+
+            <input
+              id="p_inst"
+              type="number"
+              min="1"
+              value="1"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label for="p_dt">
+              Data
+            </label>
+
+            <input
+              id="p_dt"
+              type="date"
+              value="${iso(new Date())}"
+            >
+
+          </div>
+
+        </div>
+
+
+        <label for="p_note">
+          Observação
+        </label>
+
+        <input
+          id="p_note"
+          placeholder="Ex.: entrada da reserva"
+        >
+
+
+        <div class="acts">
+
+          <button
+            class="lime"
+            onclick="addPay('${id}')"
+          >
+            Lançar pagamento
+          </button>
+
+        </div>
+
+      `;
+    }
+
+
+    h += '<div class="acts">';
+
+
+    if(b.status === 'aberta'){
+
+      if(me.role === 'owner'){
+
+        h += `
+          <button
+            onclick="setStatus('${id}','finalizada')"
+          >
+            Finalizar reserva
+          </button>
+        `;
+      }
+
+      h += `
+        <button
+          class="bad"
+          onclick="setStatus('${id}','cancelada')"
+        >
+          Cancelar reserva
+        </button>
+      `;
+
+    }else if(me.role === 'owner'){
+
+      h += `
+        <button
+          class="alt"
+          onclick="setStatus('${id}','aberta')"
+        >
+          Reabrir
+        </button>
+      `;
+    }
+
+
+    h += '</div>';
+
+
+    h += `
+
+      <h3>
+        Histórico
+      </h3>
+
+      ${
+        hist.map(x => `
+
+          <div class="line">
+
+            <span>
+              ${esc(x.action)}
+              ·
+              ${esc(nm(x.user_id))}
+            </span>
+
+            <span class="m">
+              ${dtBR(x.at)}
+            </span>
+
+          </div>
+
+        `).join('')
+
+        || '<div class="m">Sem registros.</div>'
+      }
+
+    `;
   }
-})
+
+
+  $('#dlg').innerHTML = h;
+
+  $('#dlg').showModal();
+}
+
+
+// ===============================
+// SALVAR RESERVA
+// ===============================
+
+function toggleInstallments(){
+  const method = $('#c_signal_method');
+  const amount = Number($('#c_signal')?.value || 0);
+  const field = $('#signal-installments');
+  if(!method || !field) return;
+  const visible = amount > 0 && method.value === 'Cartão de crédito';
+  field.style.display = visible ? 'block' : 'none';
+}
+
+
+async function saveBooking(id,sendEmail=false){
+
+  const v = {
+    client_name:val('c_name').trim(),
+    client_phone:val('c_tel').trim(),
+    client_email:val('c_email').trim(),
+    client_document:val('c_doc').trim(),
+    tour_date:val('c_dt'),
+    tour_time:val('c_hr') || null,
+    itinerary:val('c_it'),
+    pax:Number(val('c_px')) || 1,
+    total:Number(val('c_tt')) || 0,
+    client_message:val('c_client_message').trim(),
+    ticket_included:$('#c_ti').checked,
+    ticket_bought:$('#c_tb').checked,
+    notes:val('c_nt').trim()
+  };
+
+  if(!id && (!v.client_name || !v.client_document || !v.client_email || !v.tour_date || !v.itinerary || v.pax < 1)){
+    return alert('Preencha nome completo, documento, e-mail, data, quantidade de pessoas e roteiro.');
+  }
+
+  if(sendEmail && !v.client_email){
+    return alert('Informe o e-mail do cliente antes de enviar o voucher.');
+  }
+
+  if(v.client_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.client_email)){
+    return alert('Informe um e-mail válido para o cliente.');
+  }
+
+  const signal = id ? 0 : Number(val('c_signal')) || 0;
+  if(!id && (signal < 0 || signal > v.total)){
+    return alert('O sinal precisa ser igual ou menor que o valor total da reserva.');
+  }
+
+  let bookingId = id;
+  let r;
+  if(id){
+    r = await db.from('bookings').update(v).eq('id',id);
+  }else{
+    r = await db.from('bookings').insert({...v,account_id:acc.id}).select('id').single();
+    if(!r.error) bookingId = r.data.id;
+  }
+
+  if(r.error){
+    return alert('Não foi possível salvar a reserva: ' + r.error.message);
+  }
+
+  if(!id){
+    const method = val('c_signal_method');
+    const installments = method === 'Cartão de crédito'
+      ? Math.max(1,Number(val('c_signal_installments')) || 1)
+      : 1;
+    const paidAt = val('c_signal_date') || iso(new Date());
+
+    if(signal > 0){
+      const paymentResult = await db.from('payments').insert({
+        booking_id:bookingId,
+        account_id:acc.id,
+        amount:signal,
+        method,
+        payment_type:'sinal',
+        installments,
+        paid_at:paidAt
+      });
+
+      if(paymentResult.error){
+        $('#dlg').close();
+        await load();
+        return alert('A reserva foi salva, mas não foi possível registrar o sinal: ' + paymentResult.error.message + '. Abra a reserva para lançar o pagamento.');
+      }
+    }
+  }
+
+  $('#dlg').close();
+  await load();
+
+  if(sendEmail){
+    await sendBookingVoucher(bookingId);
+  }
+}
+
+
+// ===============================
+// PAGAMENTOS
+// ===============================
+
+async function addPay(bid){
+
+  const amount =
+    Number(val('p_amt'));
+
+  const payment_type =
+    val('p_type');
+
+  const method =
+    val('p_met');
+
+  const installments =
+    Number(val('p_inst')) || 1;
+
+  const paid_at =
+    val('p_dt');
+
+  const notes =
+    val('p_note').trim();
+
+
+  if(!(amount > 0)){
+
+    return alert(
+      'Informe o valor do pagamento.'
+    );
+  }
+
+
+  if(
+    method !== 'Cartão de crédito' &&
+    installments !== 1
+  ){
+
+    return alert(
+      'Parcelas só podem ser usadas no cartão de crédito.'
+    );
+  }
+
+
+  const r =
+    await db
+      .from('payments')
+      .insert({
+
+        booking_id:bid,
+
+        account_id:acc.id,
+
+        amount,
+
+        method,
+
+        payment_type,
+
+        installments,
+
+        notes:
+          notes || null,
+
+        paid_at
+      });
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  await load();
+
+  openBooking(bid);
+}
+
+
+async function voidPay(pid,bid){
+
+  if(
+    !confirm(
+      'Estornar este pagamento?'
+    )
+  ){
+    return;
+  }
+
+
+  const r =
+    await db
+      .from('payments')
+      .update({
+        voided:true
+      })
+      .eq('id',pid);
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  await load();
+
+  openBooking(bid);
+}
+
+
+// ===============================
+// STATUS
+// ===============================
+
+async function setStatus(id,s){
+
+  if(
+    !confirm(
+      'Confirmar: ' + s + '?'
+    )
+  ){
+    return;
+  }
+
+
+  const r =
+    await db
+      .from('bookings')
+      .update({
+        status:s
+      })
+      .eq('id',id);
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  await load();
+
+  openBooking(id);
+}
+
+
+// ===============================
+// VOUCHER
+// ===============================
+
+async function sendBookingVoucher(id){
+  const {error} = await db.functions.invoke('send-booking-voucher',{
+    body:{booking_id:id}
+  });
+
+  if(error){
+    console.error(error);
+    return alert('A reserva foi salva, mas o e-mail não foi enviado. Confira a configuração da função de e-mail no Supabase.');
+  }
+
+  alert('Confirmação e voucher enviados para o e-mail do cliente.');
+}
+
+
+function voucher(id){
+
+  const b =
+    bookings.find(x => x.id === id);
+
+  const open =
+    Number(b.total) - paid(b);
+
+
+  const w =
+    window.open(
+      '',
+      '_blank'
+    );
+
+
+  w.document.write(`
+
+    <!doctype html>
+
+    <meta
+      charset="utf-8"
+    >
+
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1"
+    >
+
+    <title>
+      Voucher
+    </title>
+
+    <body
+      style="
+        font:16px/1.5 system-ui;
+        max-width:600px;
+        margin:20px auto;
+        padding:0 14px;
+        color:#17201b
+      "
+    >
+
+      <h1
+        style="
+          color:#0f3d2e;
+          margin-bottom:0
+        "
+      >
+        ${esc(acc.name)}
+      </h1>
+
+      <p style="margin-top:0">
+        Confirmação de reserva
+      </p>
+
+      <hr>
+
+      <p>
+
+        <b>
+          Código da reserva:
+        </b>
+
+        ${esc(b.booking_code || '—')}
+
+        <br>
+
+        <b>
+          Cliente:
+        </b>
+
+        ${esc(b.client_name)}
+
+        <br>
+
+        <b>
+          Data:
+        </b>
+
+        ${dBR(b.tour_date)}
+        ${esc((b.tour_time || '').slice(0,5))}
+
+        <br>
+
+        <b>
+          Roteiro:
+        </b>
+
+        ${esc(b.itinerary)}
+
+        <br>
+
+        <b>
+          Pessoas:
+        </b>
+
+        ${b.pax}
+
+        <br>
+
+        <b>
+          Ingresso:
+        </b>
+
+        ${
+          b.ticket_included
+          ? 'incluso'
+          : 'não incluso'
+        }
+
+      </p>
+
+
+      <p>
+
+        <b>
+          Valor total:
+        </b>
+
+        ${brl(b.total)}
+
+        <br>
+
+        <b>
+          Pago:
+        </b>
+
+        ${brl(paid(b))}
+
+        <br>
+
+        <b>
+          Em aberto:
+        </b>
+
+        ${brl(open)}
+
+      </p>
+
+
+      ${
+        b.client_message
+        ? `
+          <h3>Informações para o cliente</h3>
+          <p style="white-space:pre-wrap">${esc(b.client_message)}</p>
+        `
+        : ''
+      }
+
+      <h3>
+        Política de cancelamento
+      </h3>
+
+      <p
+        style="white-space:pre-wrap"
+      >
+        ${esc(
+          acc.cancel_policy ||
+          'Defina a política em Equipe.'
+        )}
+      </p>
+
+
+      ${
+        acc.review_url
+        ? `
+          <p>
+            Depois do passeio,
+            conte como foi:
+
+            <a
+              href="${esc(acc.review_url)}"
+            >
+              deixar avaliação
+            </a>
+          </p>
+        `
+        : ''
+      }
+
+
+      <button
+        onclick="print()"
+      >
+        Imprimir / salvar PDF
+      </button>
+
+    </body>
+  `);
+
+  w.document.close();
+}
+
+
+// ===============================
+// ITINERÁRIOS
+// ===============================
+
+async function openItineraries(){
+
+  const r =
+    await db
+      .from('itineraries')
+      .select('*')
+      .eq('account_id',acc.id)
+      .order('name');
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  const items =
+    r.data || [];
+
+
+  $('#dlg').innerHTML = `
+
+    <form
+      method="dialog"
+      style="text-align:right"
+    >
+      <button class="alt">
+        Fechar
+      </button>
+    </form>
+
+
+    <h2 style="margin:0">
+      Itinerários
+    </h2>
+
+    <p class="m">
+      Cadastre os roteiros que você oferece.
+    </p>
+
+
+    <h3>
+      Novo itinerário
+    </h3>
+
+
+    <label for="it_name">
+      Nome
+    </label>
+
+    <input
+      id="it_name"
+      placeholder="Ex.: Cristo + Pão de Açúcar"
+    >
+
+
+    <label for="it_desc">
+      Descrição
+    </label>
+
+    <textarea
+      id="it_desc"
+      rows="3"
+      placeholder="Ex.: Cristo Redentor, Pão de Açúcar e fotos nos principais pontos."
+    ></textarea>
+
+
+    <div class="row">
+
+      <div>
+
+        <label for="it_duration">
+          Duração
+        </label>
+
+        <input
+          id="it_duration"
+          placeholder="Ex.: 5 horas"
+        >
+
+      </div>
+
+
+      <div>
+
+        <label for="it_price">
+          Preço por pessoa (R$)
+        </label>
+
+        <input
+          id="it_price"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="599.90"
+        >
+
+      </div>
+
+    </div>
+
+
+    <div class="acts">
+
+      <button
+        class="lime"
+        onclick="saveItinerary()"
+      >
+        Cadastrar itinerário
+      </button>
+
+    </div>
+
+
+    <h3>
+      Itinerários cadastrados
+    </h3>
+
+
+    ${
+      items.length
+
+      ? items.map(i => `
+
+          <div class="line">
+
+            <span>
+
+              <b>
+                ${esc(i.name)}
+              </b>
+
+              <br>
+
+              <span class="m">
+
+                ${esc(i.duration || '')}
+
+                ${
+                  i.price
+                  ? ' · ' + brl(i.price) + ' / pessoa'
+                  : ''
+                }
+
+                ${
+                  i.active
+                  ? ' · ativo'
+                  : ' · inativo'
+                }
+
+              </span>
+
+            </span>
+
+          </div>
+
+        `).join('')
+
+      : `
+        <div class="empty">
+          Nenhum itinerário cadastrado.
+        </div>
+      `
+    }
+
+  `;
+
+
+  $('#dlg').showModal();
+}
+
+
+async function saveItinerary(){
+
+  const name =
+    val('it_name').trim();
+
+  const description =
+    val('it_desc').trim();
+
+  const duration =
+    val('it_duration').trim();
+
+  const price =
+    Number(val('it_price')) || 0;
+
+
+  if(!name){
+
+    return alert(
+      'Informe o nome do itinerário.'
+    );
+  }
+
+
+  const r =
+    await db
+      .from('itineraries')
+      .insert({
+
+        account_id:acc.id,
+
+        name,
+
+        description:
+          description || null,
+
+        duration:
+          duration || null,
+
+        price,
+
+        active:true
+      });
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  alert(
+    'Itinerário cadastrado com sucesso!'
+  );
+
+  openItineraries();
+}
+
+
+// ===============================
+// EQUIPE / CONFIGURAÇÕES
+// ===============================
+
+async function openConfig(){
+
+  const inv =
+    (
+      await db
+        .from('invites')
+        .select('*')
+    ).data || [];
+
+
+  $('#dlg').innerHTML = `
+
+    <form
+      method="dialog"
+      style="text-align:right"
+    >
+
+      <button class="alt">
+        Fechar
+      </button>
+
+    </form>
+
+
+    <h2 style="margin:0">
+      Equipe e configurações
+    </h2>
+
+
+    <h3>
+      Pessoas com acesso
+    </h3>
+
+
+    ${
+      Object.values(team)
+        .map(m => `
+
+          <div class="line">
+
+            <span>
+
+              ${esc(m.name)}
+              ·
+              ${esc(m.email)}
+
+            </span>
+
+            <span class="m">
+
+              ${
+                m.role === 'owner'
+                ? 'dono'
+                : 'equipe'
+              }
+
+            </span>
+
+          </div>
+
+        `)
+        .join('')
+    }
+
+
+    ${
+      inv.map(i => `
+
+        <div class="line">
+
+          <span>
+            ${esc(i.email)}
+          </span>
+
+          <span class="m">
+            convite pendente
+          </span>
+
+        </div>
+
+      `).join('')
+    }
+
+
+    <label for="i_em">
+      Convidar por e-mail
+    </label>
+
+    <div class="row">
+
+      <input
+        id="i_em"
+        type="email"
+      >
+
+      <button
+        onclick="invite()"
+        style="flex:0 0 auto"
+      >
+        Convidar
+      </button>
+
+    </div>
+
+
+    <div class="m">
+      A pessoa usa “Criar conta”
+      com esse mesmo e-mail.
+    </div>
+
+
+    <h3>
+      Dados do voucher
+    </h3>
+
+
+    <label for="a_nm">
+      Nome que aparece no voucher
+    </label>
+
+    <input
+      id="a_nm"
+      value="${esc(acc.name)}"
+    >
+
+
+    <label for="a_rv">
+      Link de avaliação
+    </label>
+
+    <input
+      id="a_rv"
+      value="${esc(acc.review_url)}"
+    >
+
+
+    <label for="a_cp">
+      Política de cancelamento
+    </label>
+
+    <textarea
+      id="a_cp"
+      rows="5"
+    >${esc(acc.cancel_policy)}</textarea>
+
+
+    <div class="acts">
+
+      <button
+        onclick="saveConfig()"
+      >
+        Salvar configurações
+      </button>
+
+    </div>
+
+  `;
+
+
+  $('#dlg').showModal();
+}
+
+
+async function invite(){
+
+  const email =
+    val('i_em')
+      .trim()
+      .toLowerCase();
+
+
+  if(!email) return;
+
+
+  const r =
+    await db
+      .from('invites')
+      .insert({
+
+        email,
+
+        account_id:acc.id,
+
+        role:'staff'
+
+      });
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  openConfig();
+}
+
+
+async function saveConfig(){
+
+  const r =
+    await db
+      .from('accounts')
+      .update({
+
+        name:
+          val('a_nm'),
+
+        review_url:
+          val('a_rv'),
+
+        cancel_policy:
+          val('a_cp')
+
+      })
+      .eq('id',acc.id);
+
+
+  if(r.error){
+
+    return alert(r.error.message);
+  }
+
+
+  acc =
+    (
+      await db
+        .from('accounts')
+        .select('*')
+        .single()
+    ).data;
+
+
+  $('#dlg').close();
+
+  render();
+}
+
+
+// ===============================
+// PREÇO DO ITINERÁRIO
+// ===============================
+
+function applyItineraryPrice(){
+
+  const select =
+    $('#c_it');
+
+  const option =
+    select.options[
+      select.selectedIndex
+    ];
+
+
+  if(
+    !option ||
+    !option.value
+  ){
+    return;
+  }
+
+
+  const price =
+    Number(
+      option.dataset.price || 0
+    );
+
+
+  const pax =
+    Number(
+      $('#c_px').value
+    ) || 1;
+
+
+  if(price > 0){
+
+    $('#c_tt').value =
+      (price * pax).toFixed(2);
+  }
+}
+
+
+function applyPaxPrice(){
+
+  applyItineraryPrice();
+}
+
+
+// ===============================
+// INICIAR
+// ===============================
+
+start();
+
+</script>
+
+</body>
+</html>
