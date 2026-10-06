@@ -421,7 +421,6 @@ let acc;
 let team = {};
 let bookings = [];
 let summaryBookings = [];
-let week = monday(new Date());
 let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
 
@@ -574,42 +573,18 @@ async function logout(){
 
 async function load(){
 
-  const [weekResult, summaryResult] = await Promise.all([
-    db
-      .from('bookings')
-      .select('*, payments(*)')
-      .gte('tour_date',iso(week))
-      .lte(
-        'tour_date',
-        iso(addDays(week,6))
-      )
-      .order('tour_date')
-      .order('tour_time'),
-    db
-      .from('bookings')
-      .select('*, payments(*)')
-      .order('tour_date')
-  ]);
   const r = await db
     .from('bookings')
     .select('*, payments(*)')
     .order('tour_date')
     .order('tour_time');
 
-  if(weekResult.error){
-    return alert('Não foi possível carregar a agenda: ' + weekResult.error.message);
   if(r.error){
     return alert('Não foi possível carregar as reservas: ' + r.error.message);
   }
 
-  if(summaryResult.error){
-    return alert('Não foi possível carregar o resumo: ' + summaryResult.error.message);
-  }
   bookings = r.data || [];
   summaryBookings = bookings;
-
-  bookings = weekResult.data || [];
-  summaryBookings = summaryResult.data || [];
 
   render();
 }
@@ -621,59 +596,9 @@ async function load(){
 
 function render(){
 
-  const days =
-    [0,1,2,3,4,5,6]
-      .map(i => addDays(week,i));
-
-  const names = [
-    'Domingo',
-    'Segunda',
-    'Terça',
-    'Quarta',
-    'Quinta',
-    'Sexta',
-    'Sábado'
-  ];
-
   let h = `
     <header>
-
       <b>${esc(acc.name)}</b>
-
-      <button
-        class="lime"
-        onclick="openBooking()"
-      >
-        Nova reserva
-      </button>
-
-      ${
-        me.role === 'owner'
-        ? `
-          <button
-            class="alt"
-            onclick="openConfig()"
-          >
-            Equipe
-          </button>
-
-          <button
-            class="alt"
-            onclick="openItineraries()"
-          >
-            Itinerários
-          </button>
-        `
-        : ''
-      }
-
-      <button
-        class="alt"
-        onclick="logout()"
-      >
-        Sair
-      </button>
-
       <button class="lime" onclick="openBooking()">Nova reserva</button>
       ${me.role === 'owner' ? `
         <button class="alt" onclick="openConfig()">Equipe</button>
@@ -683,37 +608,18 @@ function render(){
     </header>
 
     <main>
-
       ${summaryView()}
       ${calendarView()}
       ${dayBookingsView()}
     </main>
   `;
 
-      <div class="nav">
   $('#app').innerHTML = h;
 }
 
-        <button
-          class="alt"
-          onclick="go(-7)"
-        >
-          ‹
-        </button>
 
-        <b>
-          ${dBR(iso(week)).slice(0,5)}
-          a
-          ${dBR(iso(addDays(week,6))).slice(0,5)}
-        </b>
 function calendarView(){
 
-        <button
-          class="alt"
-          onclick="go(7)"
-        >
-          ›
-        </button>
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
   const firstWeekday = (new Date(year,month,1).getDay()+6)%7;
@@ -723,23 +629,14 @@ function calendarView(){
   });
   const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
 
-        <button
-          class="alt"
-          onclick="go(0)"
-        >
-          Hoje
-        </button>
   let cells = weekdays.map(name =>
     `<div class="calendar-weekday">${name}</div>`
   ).join('');
 
-      </div>
-  `;
   for(let i=0;i<firstWeekday;i++){
     cells += '<div class="calendar-day empty-day" aria-hidden="true"></div>';
   }
 
-  if(!bookings.length){
   for(let day=1;day<=daysInMonth;day++){
     const date = iso(new Date(year,month,day));
     const count = summaryBookings.filter(b =>
@@ -751,11 +648,6 @@ function calendarView(){
       weekday:'long',day:'numeric',month:'long',year:'numeric'
     });
 
-    h += `
-      <div class="empty">
-        Nenhuma reserva nesta semana.
-        Toque em “Nova reserva”.
-      </div>
     cells += `
       <button
         class="calendar-day ${selected ? 'selected' : ''} ${today ? 'today' : ''}"
@@ -769,19 +661,6 @@ function calendarView(){
     `;
   }
 
-  for(const d of days){
-
-    const list =
-      bookings.filter(
-        b => b.tour_date === iso(d)
-      );
-
-    if(!list.length) continue;
-
-    h += `
-      <div class="day">
-        ${names[d.getDay()]},
-        ${dBR(iso(d)).slice(0,5)}
   return `
     <section aria-label="Agenda mensal">
       <div class="nav">
@@ -794,21 +673,12 @@ function calendarView(){
         <div class="calendar-grid">${cells}</div>
       </div>
     </section>
-    `;
   `;
 }
 
-    for(const b of list){
 
-      const open =
-        Number(b.total) - paid(b);
 function dayBookingsView(){
 
-      h += `
-        <div
-          class="card ${b.status}"
-          onclick="openBooking('${b.id}')"
-        >
   const [year,month,day] = selectedDate.split('-').map(Number);
   const date = new Date(year,month-1,day);
   const fullDate = date.toLocaleDateString('pt-BR',{
@@ -818,13 +688,8 @@ function dayBookingsView(){
     .filter(b => b.tour_date === selectedDate)
     .sort((a,b) => (a.tour_time || '').localeCompare(b.tour_time || ''));
 
-          <div class="top">
   let h = `<h2 style="text-transform:capitalize">${esc(fullDate)}</h2>`;
 
-            <b>
-              ${esc((b.tour_time || '').slice(0,5))}
-              ${esc(b.client_name)}
-            </b>
   if(!list.length){
     return h + '<div class="empty">Nenhum serviço agendado para este dia.</div>';
   }
@@ -841,9 +706,6 @@ function dayBookingsView(){
         <div class="m">${esc(b.itinerary || 'Sem roteiro')} · ${b.pax} pessoa(s)</div>
         <div class="m">
           Total ${brl(b.total)} · Pago ${brl(paid(b))} ·
-            <span class="tag ${b.status}">
-              ${b.status}
-            </span>
           <span class="${open > 0 ? 'open' : 'ok'}">
             ${open > 0 ? 'Em aberto ' + brl(open) : 'Quitado'}
           </span>
@@ -852,21 +714,10 @@ function dayBookingsView(){
     `;
   }
 
-          </div>
   return h;
 }
 
-          <div class="m">
-            <b>
-              ${esc(b.booking_code || 'Sem código')}
-            </b>
-          </div>
 
-          <div class="m">
-            ${esc(b.itinerary || 'Sem roteiro')}
-            ·
-            ${b.pax} pessoa(s)
-          </div>
 function selectDate(date){
   selectedDate = date;
   const [year,month] = date.split('-').map(Number);
@@ -874,12 +725,7 @@ function selectDate(date){
   render();
 }
 
-          <div class="m">
 
-            Total ${brl(b.total)}
-            ·
-            Pago ${brl(paid(b))}
-            ·
 function changeMonth(amount){
   calendarMonth = new Date(
     calendarMonth.getFullYear(),
@@ -889,25 +735,7 @@ function changeMonth(amount){
   render();
 }
 
-            <span
-              class="${open > 0 ? 'open' : 'ok'}"
-            >
-              ${
-                open > 0
-                ? 'Em aberto ' + brl(open)
-                : 'Quitado'
-              }
-            </span>
 
-          </div>
-
-        </div>
-      `;
-    }
-  }
-
-  $('#app').innerHTML =
-    h + '</main>';
 function goToday(){
   const today = new Date();
   selectedDate = iso(today);
@@ -951,17 +779,6 @@ function summaryView(){
 }
 
 
-function go(n){
-
-  week =
-    n
-    ? addDays(week,n)
-    : monday(new Date());
-
-  load();
-}
-
-
 // ===============================
 // ABRIR RESERVA
 // ===============================
@@ -974,7 +791,6 @@ async function openBooking(id){
         status:'aberta',
         pax:1,
         total:0,
-        tour_date:iso(new Date()),
         tour_date:selectedDate,
         payments:[]
       };
