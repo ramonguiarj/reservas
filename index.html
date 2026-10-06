@@ -270,6 +270,55 @@ h3{
   .summary-card{padding:10px 12px}
   .summary-card strong{font-size:19px}
 }
+
+.calendar{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px;
+  margin-bottom:18px
+}
+
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:4px
+}
+
+.calendar-weekday{
+  text-align:center;
+  color:var(--mut);
+  font-size:12px;
+  font-weight:600;
+  padding:5px 0
+}
+
+.calendar-day{
+  min-height:62px;
+  padding:6px 2px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:#f5f6f2;
+  color:var(--ink);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:3px
+}
+
+.calendar-day:hover{border-color:var(--g)}
+.calendar-day.selected{background:var(--g);color:#fff}
+.calendar-day.today{border-color:var(--l);border-width:2px}
+.calendar-day small{font-size:10px;line-height:1.1;color:inherit}
+.calendar-day.empty-day{visibility:hidden}
+
+@media(max-width:520px){
+  .calendar{padding:6px}
+  .calendar-grid{gap:2px}
+  .calendar-day{min-height:48px;padding:5px 0;font-size:14px}
+  .calendar-day small{font-size:9px}
+}
 </style>
 </head>
 
@@ -373,6 +422,8 @@ let team = {};
 let bookings = [];
 let summaryBookings = [];
 let week = monday(new Date());
+let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let selectedDate = iso(new Date());
 
 
 // ===============================
@@ -539,14 +590,23 @@ async function load(){
       .select('*, payments(*)')
       .order('tour_date')
   ]);
+  const r = await db
+    .from('bookings')
+    .select('*, payments(*)')
+    .order('tour_date')
+    .order('tour_time');
 
   if(weekResult.error){
     return alert('Não foi possível carregar a agenda: ' + weekResult.error.message);
+  if(r.error){
+    return alert('Não foi possível carregar as reservas: ' + r.error.message);
   }
 
   if(summaryResult.error){
     return alert('Não foi possível carregar o resumo: ' + summaryResult.error.message);
   }
+  bookings = r.data || [];
+  summaryBookings = bookings;
 
   bookings = weekResult.data || [];
   summaryBookings = summaryResult.data || [];
@@ -614,13 +674,25 @@ function render(){
         Sair
       </button>
 
+      <button class="lime" onclick="openBooking()">Nova reserva</button>
+      ${me.role === 'owner' ? `
+        <button class="alt" onclick="openConfig()">Equipe</button>
+        <button class="alt" onclick="openItineraries()">Itinerários</button>
+      ` : ''}
+      <button class="alt" onclick="logout()">Sair</button>
     </header>
 
     <main>
 
       ${summaryView()}
+      ${calendarView()}
+      ${dayBookingsView()}
+    </main>
+  `;
 
       <div class="nav">
+  $('#app').innerHTML = h;
+}
 
         <button
           class="alt"
@@ -634,6 +706,7 @@ function render(){
           a
           ${dBR(iso(addDays(week,6))).slice(0,5)}
         </b>
+function calendarView(){
 
         <button
           class="alt"
@@ -641,6 +714,14 @@ function render(){
         >
           ›
         </button>
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstWeekday = (new Date(year,month,1).getDay()+6)%7;
+  const daysInMonth = new Date(year,month+1,0).getDate();
+  const monthName = calendarMonth.toLocaleDateString('pt-BR',{
+    month:'long',year:'numeric'
+  });
+  const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
 
         <button
           class="alt"
@@ -648,17 +729,43 @@ function render(){
         >
           Hoje
         </button>
+  let cells = weekdays.map(name =>
+    `<div class="calendar-weekday">${name}</div>`
+  ).join('');
 
       </div>
   `;
+  for(let i=0;i<firstWeekday;i++){
+    cells += '<div class="calendar-day empty-day" aria-hidden="true"></div>';
+  }
 
   if(!bookings.length){
+  for(let day=1;day<=daysInMonth;day++){
+    const date = iso(new Date(year,month,day));
+    const count = summaryBookings.filter(b =>
+      b.tour_date === date && b.status !== 'cancelada'
+    ).length;
+    const selected = date === selectedDate;
+    const today = date === iso(new Date());
+    const fullDate = new Date(year,month,day).toLocaleDateString('pt-BR',{
+      weekday:'long',day:'numeric',month:'long',year:'numeric'
+    });
 
     h += `
       <div class="empty">
         Nenhuma reserva nesta semana.
         Toque em “Nova reserva”.
       </div>
+    cells += `
+      <button
+        class="calendar-day ${selected ? 'selected' : ''} ${today ? 'today' : ''}"
+        aria-label="${esc(fullDate)}${count ? ', ' + count + ' reservas' : ''}"
+        aria-pressed="${selected}"
+        onclick="selectDate('${date}')"
+      >
+        <span>${day}</span>
+        ${count ? `<small>${count} ${count === 1 ? 'reserva' : 'reservas'}</small>` : ''}
+      </button>
     `;
   }
 
@@ -675,32 +782,79 @@ function render(){
       <div class="day">
         ${names[d.getDay()]},
         ${dBR(iso(d)).slice(0,5)}
+  return `
+    <section aria-label="Agenda mensal">
+      <div class="nav">
+        <button class="alt" aria-label="Mês anterior" onclick="changeMonth(-1)">‹</button>
+        <b style="text-transform:capitalize">${esc(monthName)}</b>
+        <button class="alt" aria-label="Próximo mês" onclick="changeMonth(1)">›</button>
+        <button class="alt" onclick="goToday()">Hoje</button>
       </div>
+      <div class="calendar">
+        <div class="calendar-grid">${cells}</div>
+      </div>
+    </section>
     `;
+  `;
+}
 
     for(const b of list){
 
       const open =
         Number(b.total) - paid(b);
+function dayBookingsView(){
 
       h += `
         <div
           class="card ${b.status}"
           onclick="openBooking('${b.id}')"
         >
+  const [year,month,day] = selectedDate.split('-').map(Number);
+  const date = new Date(year,month-1,day);
+  const fullDate = date.toLocaleDateString('pt-BR',{
+    weekday:'long',day:'numeric',month:'long',year:'numeric'
+  });
+  const list = summaryBookings
+    .filter(b => b.tour_date === selectedDate)
+    .sort((a,b) => (a.tour_time || '').localeCompare(b.tour_time || ''));
 
           <div class="top">
+  let h = `<h2 style="text-transform:capitalize">${esc(fullDate)}</h2>`;
 
             <b>
               ${esc((b.tour_time || '').slice(0,5))}
               ${esc(b.client_name)}
             </b>
+  if(!list.length){
+    return h + '<div class="empty">Nenhum serviço agendado para este dia.</div>';
+  }
 
+  for(const b of list){
+    const open = Number(b.total) - paid(b);
+    h += `
+      <div class="card ${b.status}" onclick="openBooking('${b.id}')">
+        <div class="top">
+          <b>${esc((b.tour_time || '').slice(0,5))} ${esc(b.client_name)}</b>
+          <span class="tag ${b.status}">${esc(b.status)}</span>
+        </div>
+        <div class="m"><b>${esc(b.booking_code || 'Sem código')}</b></div>
+        <div class="m">${esc(b.itinerary || 'Sem roteiro')} · ${b.pax} pessoa(s)</div>
+        <div class="m">
+          Total ${brl(b.total)} · Pago ${brl(paid(b))} ·
             <span class="tag ${b.status}">
               ${b.status}
             </span>
+          <span class="${open > 0 ? 'open' : 'ok'}">
+            ${open > 0 ? 'Em aberto ' + brl(open) : 'Quitado'}
+          </span>
+        </div>
+      </div>
+    `;
+  }
 
           </div>
+  return h;
+}
 
           <div class="m">
             <b>
@@ -713,6 +867,12 @@ function render(){
             ·
             ${b.pax} pessoa(s)
           </div>
+function selectDate(date){
+  selectedDate = date;
+  const [year,month] = date.split('-').map(Number);
+  calendarMonth = new Date(year,month-1,1);
+  render();
+}
 
           <div class="m">
 
@@ -720,6 +880,14 @@ function render(){
             ·
             Pago ${brl(paid(b))}
             ·
+function changeMonth(amount){
+  calendarMonth = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth()+amount,
+    1
+  );
+  render();
+}
 
             <span
               class="${open > 0 ? 'open' : 'ok'}"
@@ -740,6 +908,11 @@ function render(){
 
   $('#app').innerHTML =
     h + '</main>';
+function goToday(){
+  const today = new Date();
+  selectedDate = iso(today);
+  calendarMonth = new Date(today.getFullYear(),today.getMonth(),1);
+  render();
 }
 
 
@@ -802,6 +975,7 @@ async function openBooking(id){
         pax:1,
         total:0,
         tour_date:iso(new Date()),
+        tour_date:selectedDate,
         payments:[]
       };
 
