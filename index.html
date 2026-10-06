@@ -133,6 +133,27 @@ label{
   text-align:center
 }
 
+.tabs{
+  display:flex;
+  gap:8px;
+  margin:0 0 14px;
+  border-bottom:1px solid var(--line)
+}
+
+.tabs button{
+  border-radius:8px 8px 0 0;
+  background:transparent;
+  color:var(--mut);
+  border-bottom:3px solid transparent;
+  padding:9px 12px
+}
+
+.tabs button[aria-selected="true"]{
+  color:var(--g);
+  border-bottom-color:var(--l);
+  font-weight:700
+}
+
 .day{
   margin:16px 0 6px;
   font-weight:700;
@@ -445,6 +466,7 @@ let googleTokenExpiresAt = 0;
 let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
 let agendaFilter = {year:String(new Date().getFullYear()),month:String(new Date().getMonth()+1),date:'',status:'todos'};
+let activeTab = 'agenda';
 
 function accessLevel(){
   return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
@@ -647,13 +669,20 @@ function render(){
 
     <main>
       ${summaryView()}
-      ${agendaFiltersView()}
-      ${calendarView()}
-      ${dayBookingsView()}
+      <nav class="tabs" role="tablist" aria-label="Visualização de reservas">
+        <button role="tab" aria-selected="${activeTab === 'agenda'}" onclick="setActiveTab('agenda')">Agenda</button>
+        <button role="tab" aria-selected="${activeTab === 'reservas'}" onclick="setActiveTab('reservas')">Todas as reservas</button>
+      </nav>
+      ${activeTab === 'agenda' ? `${calendarView()}${dayBookingsView()}` : agendaFiltersView()}
     </main>
   `;
 
   $('#app').innerHTML = h;
+}
+
+function setActiveTab(tab){
+  activeTab = tab;
+  render();
 }
 
 
@@ -874,7 +903,7 @@ function goToday(){
 
 function summaryView(){
 
-  // Reservas canceladas ficam fora dos indicadores financeiros e da contagem.
+  // Reservas canceladas ficam fora dos indicadores financeiros.
   const active =
     summaryBookings.filter(b => b.status !== 'cancelada');
 
@@ -891,8 +920,8 @@ function summaryView(){
   return `
     <section class="summary" aria-label="Resumo de reservas">
       <div class="summary-card">
-        <span>Reservas ativas</span>
-        <strong>${active.length}</strong>
+        <span>Quantidade de reservas</span>
+        <strong>${summaryBookings.length}</strong>
       </div>
       <div class="summary-card">
         <span>Valor total das reservas</span>
