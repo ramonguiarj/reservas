@@ -11,12 +11,12 @@
 
 <style>
 :root{
-  --g:#0f3d2e;
-  --l:#b6e14a;
-  --bg:#f5f6f2;
-  --ink:#17201b;
-  --mut:#66726b;
-  --line:#dde2db;
+  --g:#07383a;
+  --l:#9cff1e;
+  --bg:#f1eedf;
+  --ink:#173234;
+  --mut:#647577;
+  --line:#dcd8c8;
   --red:#a4332b;
   box-sizing:border-box
 }
@@ -27,7 +27,7 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--ink);
-  font:16px/1.45 system-ui,-apple-system,sans-serif;
+  font:16px/1.45 "Avenir Next",Avenir,Montserrat,system-ui,-apple-system,sans-serif;
   padding-bottom:env(safe-area-inset-bottom)
 }
 
@@ -42,6 +42,8 @@ header{
   top:0;
   z-index:5
 }
+
+.brandmark{width:36px;height:36px;object-fit:cover;border-radius:7px;flex:none}
 
 header b{
   flex:1;
@@ -441,6 +443,7 @@ let googleAccessToken = '';
 let googleTokenExpiresAt = 0;
 let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
+let agendaFilter = {year:String(new Date().getFullYear()),month:String(new Date().getMonth()+1),date:'',status:'todos'};
 
 function accessLevel(){
   return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
@@ -629,10 +632,12 @@ function render(){
 
   let h = `
     <header>
+      <img class="brandmark" src="ramonguia-marca.png" alt="">
       <b>${esc(acc.name)}</b>
       ${canAdd() ? '<button class="lime" onclick="openBooking()">Nova reserva</button>' : ''}
       ${me.role === 'owner' ? `
         <button class="alt" onclick="openConfig()">Equipe</button>
+        <button class="alt" onclick="openAccountSettings()">Configurações</button>
         <button class="alt" onclick="openItineraries()">Itinerários</button>
       ` : ''}
       <button class="alt" onclick="logout()">Sair</button>
@@ -640,6 +645,7 @@ function render(){
 
     <main>
       ${summaryView()}
+      ${agendaFiltersView()}
       ${calendarView()}
       ${dayBookingsView()}
     </main>
@@ -751,6 +757,90 @@ function dayBookingsView(){
   }
 
   return h;
+}
+
+function agendaFiltersView(){
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const years = new Set([String(new Date().getFullYear())]);
+  for(const booking of bookings){
+    for(const item of bookingServices(booking)){
+      const year = String(item.tour_date || '').slice(0,4);
+      if(/^\\d{4}$/.test(year)) years.add(year);
+    }
+  }
+  const yearOptions = ['<option value="todos">Todos os anos</option>',...Array.from(years).sort((a,b)=>Number(b)-Number(a)).map(year=>`<option value="${year}" ${agendaFilter.year===year?'selected':''}>${year}</option>`)].join('');
+  const monthOptions = ['<option value="todos">Todos os meses</option>',...months.map((name,index)=>`<option value="${index+1}" ${agendaFilter.month===String(index+1)?'selected':''}>${name}</option>`)].join('');
+  const matches = bookings.filter(booking=>{
+    const services = bookingServices(booking);
+    const matchesDate = agendaFilter.date
+      ? services.some(item=>item.tour_date===agendaFilter.date)
+      : services.some(item=>{
+          const [year,month] = String(item.tour_date || '').split('-');
+          return (agendaFilter.year==='todos'||year===agendaFilter.year)
+            && (agendaFilter.month==='todos'||String(Number(month))===String(Number(agendaFilter.month)));
+        });
+    if(!matchesDate) return false;
+    const payments = (booking.payments || []).filter(payment=>Number(payment.amount || 0)>0);
+    const fullyReversed = payments.length>0 && payments.every(payment=>payment.voided);
+    const rescheduled = Number(booking.reschedule_count || 0)>0 || Boolean(booking.rescheduled_at);
+    if(agendaFilter.status==='agendada') return booking.status==='aberta' && !rescheduled;
+    if(agendaFilter.status==='cancelada') return booking.status==='cancelada';
+    if(agendaFilter.status==='reagendada') return booking.status==='aberta' && rescheduled;
+    if(agendaFilter.status==='estorno_total') return fullyReversed;
+    if(agendaFilter.status==='finalizada') return booking.status==='finalizada';
+    return true;
+  }).sort((a,b)=>{
+    const ad=bookingServices(a).map(item=>item.tour_date).sort()[0]||'';
+    const bd=bookingServices(b).map(item=>item.tour_date).sort()[0]||'';
+    return ad.localeCompare(bd);
+  });
+
+  return `
+    <section aria-label="Filtros da agenda">
+      <h2>Agenda e filtros</h2>
+      <div class="row">
+        <div><label for="agenda_year">Ano</label><select id="agenda_year" onchange="setAgendaFilter('year',this.value)">${yearOptions}</select></div>
+        <div><label for="agenda_month">Mês</label><select id="agenda_month" onchange="setAgendaFilter('month',this.value)">${monthOptions}</select></div>
+      </div>
+      <div class="row">
+        <div><label for="agenda_date">Data específica</label><input id="agenda_date" type="date" value="${esc(agendaFilter.date)}" onchange="setAgendaFilter('date',this.value)"></div>
+        <div><label for="agenda_status">Situação</label><select id="agenda_status" onchange="setAgendaFilter('status',this.value)">
+          <option value="todos" ${agendaFilter.status==='todos'?'selected':''}>Todas as situações</option>
+          <option value="agendada" ${agendaFilter.status==='agendada'?'selected':''}>Agendadas</option>
+          <option value="cancelada" ${agendaFilter.status==='cancelada'?'selected':''}>Canceladas</option>
+          <option value="reagendada" ${agendaFilter.status==='reagendada'?'selected':''}>Reagendadas</option>
+          <option value="estorno_total" ${agendaFilter.status==='estorno_total'?'selected':''}>Estorno total</option>
+          <option value="finalizada" ${agendaFilter.status==='finalizada'?'selected':''}>Finalizadas</option>
+        </select></div>
+      </div>
+      <button class="alt" onclick="clearAgendaFilters()">Limpar filtros</button>
+      <h3>${matches.length} ${matches.length===1?'reserva encontrada':'reservas encontradas'}</h3>
+      ${matches.length ? matches.map(booking=>{
+        const services=bookingServices(booking);
+        const dates=services.map(item=>dBR(item.tour_date)).join(', ');
+        const voided=(booking.payments||[]).filter(payment=>payment.voided).reduce((sum,payment)=>sum+Number(payment.amount||0),0);
+        const allVoided=(booking.payments||[]).filter(payment=>Number(payment.amount||0)>0).length>0 && (booking.payments||[]).filter(payment=>Number(payment.amount||0)>0).every(payment=>payment.voided);
+        const status=allVoided?'Estorno total':booking.status==='cancelada'?'Cancelada':booking.status==='finalizada'?'Finalizada':Number(booking.reschedule_count||0)>0?'Reagendada':'Agendada';
+        return `<div class="card ${esc(booking.status)}" onclick="openBooking('${booking.id}')"><div class="top"><b>${esc(dates)} · ${esc(booking.client_name)}</b><span class="tag ${esc(booking.status)}">${status}</span></div><div class="m">${services.map(item=>`${esc(item.itinerary)} · ${esc(item.tour_time||'').slice(0,5)} · ${esc(item.pax)} pessoa(s)`).join('<br>')}</div><div class="m">Localizador: ${esc(booking.booking_code||booking.id)} · Total ${brl(booking.total)}${allVoided?` · Estorno total ${brl(voided)}`:''}</div></div>`;
+      }).join('') : '<div class="empty">Nenhuma reserva encontrada com esses filtros.</div>'}
+    </section>
+  `;
+}
+
+function setAgendaFilter(key,value){
+  agendaFilter[key]=value;
+  if((key==='year'||key==='month') && agendaFilter.date) agendaFilter.date='';
+  if(key==='date' && value){
+    const [year,month]=value.split('-');
+    agendaFilter.year=year;
+    agendaFilter.month=String(Number(month));
+  }
+  render();
+}
+
+function clearAgendaFilters(){
+  agendaFilter={year:'todos',month:'todos',date:'',status:'todos'};
+  render();
 }
 
 
@@ -1665,6 +1755,12 @@ async function saveBooking(id,sendEmail=false){
   let bookingId = id;
   let r;
   if(id){
+    const previous = bookings.find(item=>item.id===id);
+    const signature = items => bookingServices(items).map(item=>`${item.tour_date}|${String(item.tour_time||'').slice(0,5)}|${String(item.itinerary||'').trim().toLowerCase()}`).sort().join('||');
+    if(previous && signature(previous)!==signature(v)){
+      v.rescheduled_at = new Date().toISOString();
+      v.reschedule_count = Number(previous.reschedule_count || 0) + 1;
+    }
     r = await db.from('bookings').update(v).eq('id',id);
   }else{
     r = await db.from('bookings').insert({...v,account_id:acc.id}).select('id').single();
@@ -2276,7 +2372,7 @@ async function openConfig(){
 
 
     <h2 style="margin:0">
-      Equipe e configurações
+      Equipe
     </h2>
 
 
@@ -2309,6 +2405,8 @@ async function openConfig(){
               }
 
             </span>
+
+            ${m.role === 'owner' ? '' : `<button class="bad" onclick="removeCollaborator('${encodeURIComponent(m.user_id)}')">Remover acesso</button>`}
 
           </div>
 
@@ -2355,60 +2453,43 @@ async function openConfig(){
     <div class="acts"><button onclick="invite()">Enviar convite por e-mail</button></div>
 
 
-    <h3>
-      Dados do voucher
-    </h3>
-
-
-    <label for="a_nm">
-      Nome que aparece no voucher
-    </label>
-
-    <input
-      id="a_nm"
-      value="${esc(acc.name)}"
-    >
-
-
-  <label for="a_rv">
-      Link de avaliação
-    </label>
-
-  <input
-      id="a_rv"
-      value="${esc(acc.review_url)}"
-    >
-
-    <label for="a_google_client_id">Google OAuth Client ID (opcional)</label>
-    <input id="a_google_client_id" value="${esc(acc.google_calendar_client_id || '')}" placeholder="Cole aqui o ID de cliente OAuth do Google">
-    <p class="m">Depois de configurar o ID no Google Cloud, conecte e envie as reservas para o Google Agenda. O app é a fonte principal; a autorização do Google pode precisar ser renovada quando expirar.</p>
-    <button class="alt" onclick="connectGoogleCalendar()">Conectar e sincronizar com Google Agenda</button>
-
-
-    <label for="a_cp">
-      Política de cancelamento
-    </label>
-
-    <textarea
-      id="a_cp"
-      rows="5"
-    >${esc(acc.cancel_policy)}</textarea>
-
-
-    <div class="acts">
-
-      <button
-        onclick="saveConfig()"
-      >
-        Salvar configurações
-      </button>
-
-    </div>
-
   `;
 
 
   $('#dlg').showModal();
+}
+
+async function openAccountSettings(){
+  if(me.role !== 'owner') return alert('Somente o responsável pode alterar as configurações.');
+  $('#dlg').innerHTML = `
+    <form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form>
+    <h2 style="margin:0">Configurações do app</h2>
+    <h3>Dados do voucher</h3>
+    <label for="a_nm">Nome que aparece no voucher</label>
+    <input id="a_nm" value="${esc(acc.name)}">
+    <label for="a_rv">Link de avaliação</label>
+    <input id="a_rv" value="${esc(acc.review_url)}">
+    <label for="a_google_client_id">Google OAuth Client ID (opcional)</label>
+    <input id="a_google_client_id" value="${esc(acc.google_calendar_client_id || '')}" placeholder="Cole aqui o ID de cliente OAuth do Google">
+    <p class="m">Depois de configurar o ID no Google Cloud, conecte e envie as reservas para o Google Agenda. O app é a fonte principal; a autorização do Google pode precisar ser renovada quando expirar.</p>
+    <button class="alt" onclick="connectGoogleCalendar()">Conectar e sincronizar com Google Agenda</button>
+    <label for="a_cp">Política de cancelamento</label>
+    <textarea id="a_cp" rows="5">${esc(acc.cancel_policy)}</textarea>
+    <div class="acts"><button onclick="saveConfig()">Salvar configurações</button></div>
+  `;
+  $('#dlg').showModal();
+}
+
+async function removeCollaborator(encodedUserId){
+  if(me.role !== 'owner') return alert('Somente o responsável pode remover colaboradores.');
+  const userId = decodeURIComponent(encodedUserId);
+  const member = team[userId];
+  if(!member || member.role === 'owner') return alert('O responsável da conta não pode ser removido por aqui.');
+  if(!confirm(`Remover o acesso de ${member.name || member.email} ao app? A conta de login da pessoa não será apagada.`)) return;
+  const {error} = await db.from('members').delete().eq('user_id',userId).eq('account_id',acc.id);
+  if(error) return alert('Não foi possível remover o acesso: ' + error.message);
+  delete team[userId];
+  openConfig();
 }
 
 async function toggleItineraryTransport(id, current){
