@@ -2483,6 +2483,7 @@ async function openConfig(){
 
             <span class="m">${esc(i.department || 'Equipe')} · ${esc(accessLabel(i.access_level))} · pendente</span>
             <button class="alt" onclick="resendTeamInvitation('${encodeURIComponent(i.email)}')">Reenviar</button>
+            <button class="bad" onclick="deleteTeamInvitation('${encodeURIComponent(i.email)}')">Excluir convite</button>
 
         </div>
 
@@ -2591,7 +2592,18 @@ async function sendTeamInvitation(email,department,access_level){
   const sent = await db.functions.invoke('send-team-invitation',{
     body:{email,account_id:acc.id,department,access_level,app_url:inviteUrl.toString()}
   });
-  if(sent.error || sent.data?.error) return {error:sent.data?.error || sent.error?.message || 'Confira a função send-team-invitation no Supabase.'};
+  if(sent.error){
+    let detail=sent.error.message || 'Falha ao chamar a função.';
+    try{
+      const response=sent.error.context;
+      if(response && typeof response.clone==='function'){
+        const body=await response.clone().json();
+        detail=body.error || body.message || detail;
+      }
+    }catch{}
+    return {error:detail};
+  }
+  if(sent.data?.error) return {error:sent.data.error};
   return {error:''};
 }
 
@@ -2602,6 +2614,16 @@ async function resendTeamInvitation(encodedEmail){
   const result = await sendTeamInvitation(invite.data.email,invite.data.department,invite.data.access_level);
   if(result.error) return alert('Não foi possível reenviar: ' + result.error);
   alert('Convite reenviado para ' + email + '.');
+}
+
+async function deleteTeamInvitation(encodedEmail){
+  if(me.role !== 'owner') return alert('Somente o responsável pode excluir convites.');
+  const email=decodeURIComponent(encodedEmail);
+  if(!confirm(`Excluir o convite pendente de ${email}?`)) return;
+  const {error}=await db.from('invites').delete().eq('account_id',acc.id).ilike('email',email).is('accepted_at',null);
+  if(error) return alert('Não foi possível excluir o convite: ' + error.message + '. Pode ser necessário atualizar a permissão de convites no Supabase.');
+  alert('Convite pendente excluído.');
+  openConfig();
 }
 
 function teamEmailExists(email){
