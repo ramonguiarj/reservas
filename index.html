@@ -907,37 +907,15 @@ async function openBooking(id){
     }
 
 
+    <h3>Dados do cliente</h3>
+
     <label for="c_name">
-      Cliente
+      Nome completo
     </label>
 
     <input
       id="c_name"
       value="${esc(b.client_name)}"
-      ${dis}
-    >
-
-
-    <label for="c_tel">
-      WhatsApp
-    </label>
-
-    <input
-      id="c_tel"
-      value="${esc(b.client_phone)}"
-      inputmode="tel"
-      ${dis}
-    >
-
-
-    <label for="c_email">
-      E-mail
-    </label>
-
-    <input
-      id="c_email"
-      type="email"
-      value="${esc(b.client_email)}"
       ${dis}
     >
 
@@ -950,6 +928,28 @@ async function openBooking(id){
       id="c_doc"
       value="${esc(b.client_document)}"
       placeholder="CPF, RG ou passaporte"
+      ${dis}
+    >
+
+    <label for="c_email">
+      E-mail para receber a confirmação
+    </label>
+
+    <input
+      id="c_email"
+      type="email"
+      value="${esc(b.client_email)}"
+      ${dis}
+    >
+
+    <label for="c_tel">
+      WhatsApp (opcional)
+    </label>
+
+    <input
+      id="c_tel"
+      value="${esc(b.client_phone)}"
+      inputmode="tel"
       ${dis}
     >
 
@@ -988,6 +988,8 @@ async function openBooking(id){
 
     </div>
 
+
+    <h3>Serviço</h3>
 
     <label for="c_it">
       Roteiro
@@ -1064,9 +1066,39 @@ async function openBooking(id){
 
     </div>
 
+    ${!id ? `
+      <h3>Valores e sinal pago</h3>
+
+      <label for="c_signal">
+        Valor do sinal pago (R$)
+      </label>
+      <input
+        id="c_signal"
+        type="number"
+        step="0.01"
+        min="0"
+        value="0"
+        oninput="toggleInstallments()"
+      >
+
+      <label for="c_signal_method">Forma de pagamento do sinal</label>
+      <select id="c_signal_method" onchange="toggleInstallments()">
+        <option value="Pix">Pix</option>
+        <option value="Cartão de crédito">Cartão de crédito</option>
+        <option value="Transferência">Transferência</option>
+        <option value="Dinheiro">Dinheiro em espécie</option>
+      </select>
+
+      <div id="signal-installments" style="display:none">
+        <label for="c_signal_installments">Parcelas no cartão de crédito</label>
+        <input id="c_signal_installments" type="number" min="1" step="1" value="1">
+      </div>
+
+      <label for="c_signal_date">Data do pagamento</label>
+      <input id="c_signal_date" type="date" value="${iso(new Date())}">
+    ` : ''}
 
     <label>
-
       <input
         type="checkbox"
         id="c_ti"
@@ -1095,40 +1127,48 @@ async function openBooking(id){
     </label>
 
 
-    <label for="c_nt">
-      Observações
-    </label>
+    <h3>Informações do voucher</h3>
 
+    <label for="c_client_message">
+      Informação para o cliente (aparece no voucher)
+    </label>
+    <textarea
+      id="c_client_message"
+      rows="3"
+      placeholder="Ex.: ponto de encontro, o que levar ou instruções importantes"
+      ${dis}
+    >${esc(b.client_message)}</textarea>
+
+    <label for="c_nt">
+      Observações internas (visíveis somente para a equipe)
+    </label>
     <textarea
       id="c_nt"
-      rows="2"
+      rows="3"
+      placeholder="Anotações da equipe sobre esta reserva"
       ${dis}
     >${esc(b.notes)}</textarea>
-
 
     <div class="acts">
 
       ${
         locked
         ? ''
+        : id
+        ? `
+          <button onclick="saveBooking('${id}',false)">Salvar alterações</button>
+          <button class="lime" onclick="saveBooking('${id}',true)">Salvar e enviar voucher por e-mail</button>
+        `
         : `
-          <button
-            onclick="saveBooking('${id || ''}')"
-          >
-            Salvar
-          </button>
+          <button onclick="saveBooking('',false)">Salvar reserva</button>
+          <button class="lime" onclick="saveBooking('',true)">Salvar e enviar confirmação por e-mail</button>
         `
       }
 
       ${
         id
         ? `
-          <button
-            class="alt"
-            onclick="voucher('${id}')"
-          >
-            Voucher
-          </button>
+          <button class="alt" onclick="voucher('${id}')">Visualizar voucher</button>
         `
         : ''
       }
@@ -1457,80 +1497,96 @@ async function openBooking(id){
 // SALVAR RESERVA
 // ===============================
 
-async function saveBooking(id){
+function toggleInstallments(){
+  const method = $('#c_signal_method');
+  const amount = Number($('#c_signal')?.value || 0);
+  const field = $('#signal-installments');
+  if(!method || !field) return;
+  const visible = amount > 0 && method.value === 'Cartão de crédito';
+  field.style.display = visible ? 'block' : 'none';
+}
+
+
+async function saveBooking(id,sendEmail=false){
 
   const v = {
-
-    client_name:
-      val('c_name').trim(),
-
-    client_phone:
-      val('c_tel').trim(),
-
-    client_email:
-      val('c_email').trim(),
-
-    client_document:
-      val('c_doc').trim(),
-
-    tour_date:
-      val('c_dt'),
-
-    tour_time:
-      val('c_hr') || null,
-
-    itinerary:
-      val('c_it'),
-
-    pax:
-      Number(val('c_px')) || 1,
-
-    total:
-      Number(val('c_tt')) || 0,
-
-    ticket_included:
-      $('#c_ti').checked,
-
-    ticket_bought:
-      $('#c_tb').checked,
-
-    notes:
-      val('c_nt')
+    client_name:val('c_name').trim(),
+    client_phone:val('c_tel').trim(),
+    client_email:val('c_email').trim(),
+    client_document:val('c_doc').trim(),
+    tour_date:val('c_dt'),
+    tour_time:val('c_hr') || null,
+    itinerary:val('c_it'),
+    pax:Number(val('c_px')) || 1,
+    total:Number(val('c_tt')) || 0,
+    client_message:val('c_client_message').trim(),
+    ticket_included:$('#c_ti').checked,
+    ticket_bought:$('#c_tb').checked,
+    notes:val('c_nt').trim()
   };
 
-
-  if(!v.client_name || !v.tour_date){
-
-    return alert(
-      'Informe o nome do cliente e a data.'
-    );
+  if(!id && (!v.client_name || !v.client_document || !v.client_email || !v.tour_date || !v.itinerary || v.pax < 1)){
+    return alert('Preencha nome completo, documento, e-mail, data, quantidade de pessoas e roteiro.');
   }
 
+  if(sendEmail && !v.client_email){
+    return alert('Informe o e-mail do cliente antes de enviar o voucher.');
+  }
 
-  const r = id
+  if(v.client_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.client_email)){
+    return alert('Informe um e-mail válido para o cliente.');
+  }
 
-    ? await db
-        .from('bookings')
-        .update(v)
-        .eq('id',id)
+  const signal = id ? 0 : Number(val('c_signal')) || 0;
+  if(!id && (signal < 0 || signal > v.total)){
+    return alert('O sinal precisa ser igual ou menor que o valor total da reserva.');
+  }
 
-    : await db
-        .from('bookings')
-        .insert({
-          ...v,
-          account_id:acc.id
-        });
-
+  let bookingId = id;
+  let r;
+  if(id){
+    r = await db.from('bookings').update(v).eq('id',id);
+  }else{
+    r = await db.from('bookings').insert({...v,account_id:acc.id}).select('id').single();
+    if(!r.error) bookingId = r.data.id;
+  }
 
   if(r.error){
-
-    return alert(r.error.message);
+    return alert('Não foi possível salvar a reserva: ' + r.error.message);
   }
 
+  if(!id){
+    const method = val('c_signal_method');
+    const installments = method === 'Cartão de crédito'
+      ? Math.max(1,Number(val('c_signal_installments')) || 1)
+      : 1;
+    const paidAt = val('c_signal_date') || iso(new Date());
+
+    if(signal > 0){
+      const paymentResult = await db.from('payments').insert({
+        booking_id:bookingId,
+        account_id:acc.id,
+        amount:signal,
+        method,
+        payment_type:'sinal',
+        installments,
+        paid_at:paidAt
+      });
+
+      if(paymentResult.error){
+        $('#dlg').close();
+        await load();
+        return alert('A reserva foi salva, mas não foi possível registrar o sinal: ' + paymentResult.error.message + '. Abra a reserva para lançar o pagamento.');
+      }
+    }
+  }
 
   $('#dlg').close();
+  await load();
 
-  load();
+  if(sendEmail){
+    await sendBookingVoucher(bookingId);
+  }
 }
 
 
@@ -1686,6 +1742,20 @@ async function setStatus(id,s){
 // VOUCHER
 // ===============================
 
+async function sendBookingVoucher(id){
+  const {error} = await db.functions.invoke('send-booking-voucher',{
+    body:{booking_id:id}
+  });
+
+  if(error){
+    console.error(error);
+    return alert('A reserva foi salva, mas o e-mail não foi enviado. Confira a configuração da função de e-mail no Supabase.');
+  }
+
+  alert('Confirmação e voucher enviados para o e-mail do cliente.');
+}
+
+
 function voucher(id){
 
   const b =
@@ -1826,6 +1896,15 @@ function voucher(id){
 
       </p>
 
+
+      ${
+        b.client_message
+        ? `
+          <h3>Informações para o cliente</h3>
+          <p style="white-space:pre-wrap">${esc(b.client_message)}</p>
+        `
+        : ''
+      }
 
       <h3>
         Política de cancelamento
