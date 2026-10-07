@@ -2058,17 +2058,29 @@ async function saveBooking(id,sendEmail=false){
 
 async function deleteBooking(id){
   if(!canManage()) return alert('Seu nível de acesso não permite excluir reservas.');
+
   const booking = bookings.find(item => item.id === id);
-  if(Object.keys(booking?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())) return alert('Esta reserva tem evento no Google Agenda. Abra Equipe e conecte o Google antes de excluir, para remover o evento também.');
+
   if(!confirm(`Excluir a reserva ${booking?.booking_code || ''}? Ela sairá da agenda e será ocultada, mas ficará preservada no banco.`)) return;
-  if(googleAccessToken && googleTokenExpiresAt > Date.now()){
-    try{ await removeGoogleEvents(booking); }
-    catch(error){ return alert('Não consegui remover o evento do Google Agenda; a reserva continua na agenda. ' + error.message); }
-  }
-  const {error} = await db.from('bookings').update({deleted_at:new Date().toISOString()}).eq('id',id).eq('account_id',acc.id);
+
+  const {error} = await db
+    .from('bookings')
+    .update({deleted_at:new Date().toISOString()})
+    .eq('id',id)
+    .eq('account_id',acc.id);
+
   if(error) return alert('Não foi possível excluir a reserva: ' + error.message);
+
   $('#dlg').close();
   await load();
+
+  if(booking && googleAccessToken && googleTokenExpiresAt > Date.now()){
+    try{
+      await removeGoogleEvents(booking);
+    }catch(error){
+      console.warn('Reserva excluída no app, mas o evento ainda está no Google Agenda.', error);
+    }
+  }
 }
 
 
