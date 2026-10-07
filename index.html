@@ -2208,11 +2208,6 @@ async function setStatus(id,s){
 
   if(!canManage()) return alert('Seu nível de acesso não permite alterar o status da reserva.');
 
-  const before=bookings.find(item => item.id === id);
-  if(s === 'cancelada' && Object.keys(before?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())){
-    return alert('Esta reserva tem evento no Google Agenda. Conecte o Google em Equipe antes de cancelar, para remover o evento também.');
-  }
-
   if(
     !confirm(
       'Confirmar: ' + s + '?'
