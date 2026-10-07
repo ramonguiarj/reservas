@@ -1866,7 +1866,17 @@ function configureBookingTabs(id,booking){
   const nav=document.createElement('nav');nav.className='booking-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Seções da reserva');
   nav.innerHTML=tabs.map(([key,label])=>`<button type="button" role="tab" aria-selected="${key==='dados'}" onclick="setBookingTab('${key}',this)">${label}</button>`).join('');
   const actionbar=document.createElement('div');actionbar.className='booking-actionbar';
-  actionbar.innerHTML=`${canManage()?'<button type="button" class="alt" onclick="editBookingFromToolbar()">Editar reserva</button>':''}${canAdd()?`<button type="button" class="alt" onclick="sendBookingVoucher('${id}')">Enviar voucher por e-mail</button>`:''}<button type="button" class="alt" onclick="sendBookingVoucherWhatsApp('${id}')">Enviar voucher por WhatsApp</button><button type="button" class="alt" onclick="voucher('${id}')">Voucher</button><button type="button" class="alt" onclick="voucher('${id}',true)">Voucher sem valores</button>${booking.status==='aberta'&&canManage()?`<button type="button" class="lime" onclick="setStatus('${id}','finalizada')">Finalizar</button>`:''}`;
+ actionbar.innerHTML=`
+  ${canManage()?`
+    <button type="button" class="alt" onclick="editBookingFromToolbar()">Editar reserva</button>
+    <button type="button" class="bad" onclick="deleteBooking('${id}')">Excluir reserva</button>
+  `:''}
+  ${canAdd()?`<button type="button" class="alt" onclick="sendBookingVoucher('${id}')">Enviar voucher por e-mail</button>`:''}
+  <button type="button" class="alt" onclick="sendBookingVoucherWhatsApp('${id}')">Enviar voucher por WhatsApp</button>
+  <button type="button" class="alt" onclick="voucher('${id}')">Voucher</button>
+  <button type="button" class="alt" onclick="voucher('${id}',true)">Voucher sem valores</button>
+  ${booking.status==='aberta'&&canManage()?`<button type="button" class="lime" onclick="setStatus('${id}','finalizada')">Finalizar</button>`:''}
+`;
   for(const button of Array.from(dlg.querySelectorAll('button'))){
     if(button.textContent.trim()==='Visualizar voucher' || button.textContent.trim()==='Finalizar reserva') button.remove();
   }
