@@ -950,7 +950,7 @@ function agendaFiltersView(){
   for(const booking of bookings){
     for(const item of bookingServices(booking)){
       const year = String(item.tour_date || '').slice(0,4);
-      if(/^\\d{4}$/.test(year)) years.add(year);
+     if(/^\d{4}$/.test(year)) years.add(year);
     }
   }
   const yearOptions = ['<option value="todos">Todos os anos</option>',...Array.from(years).sort((a,b)=>Number(b)-Number(a)).map(year=>`<option value="${year}" ${agendaFilter.year===year?'selected':''}>${year}</option>`)].join('');
