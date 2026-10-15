@@ -1440,15 +1440,7 @@ async function openBooking(id){
     <label><input type="checkbox" id="v_iphone" style="width:auto" ${b.voucher_options?.iphone_photos ? 'checked' : ''} ${dis}> Fotos de iPhone</label>
     <label><input type="checkbox" id="v_camera" style="width:auto" ${b.voucher_options?.camera_photos ? 'checked' : ''} ${dis}> Fotos de câmera</label>
 
-    <label for="c_pickup">
-      Endereço ou ponto de encontro / busca
-    </label>
-    <textarea
-      id="c_pickup"
-      rows="2"
-      placeholder="Ex.: nome e endereço da hospedagem ou ponto combinado"
-      ${dis}
-    >${esc(b.pickup_location)}</textarea>
+    <section class="section"><h2>Transporte e horário de início</h2><div class="content">${hasTransport ? '<b>Transporte incluso:</b> a busca será na hospedagem informada ou no ponto de encontro combinado.\n' : ''}<b>Início do tour:</b>\n${esc(services.map(item => `${dBR(item.tour_date)} · ${item.tour_time ? String(item.tour_time).slice(0,5) : 'A confirmar'}`).join('\n'))}\n\n<b>Endereço e ponto de encontro:</b>\n${esc(pickup)}</div></section>
 
     <label for="c_client_message">
       Informação para o cliente (aparece no voucher)
