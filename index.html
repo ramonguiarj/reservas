@@ -1484,7 +1484,7 @@ async function openBooking(id){
       <input id="c_signal_date" type="date" value="${iso(new Date())}">
     ` : ''}
 
-    <label>
+        <label>
       <input
         type="checkbox"
         id="c_ti"
@@ -1496,6 +1496,16 @@ async function openBooking(id){
       Ingresso incluso
 
     </label>
+
+    <label for="c_ticket_info">
+      Ingresso incluso: qual e de onde? (aparece no voucher)
+    </label>
+    <input
+      id="c_ticket_info"
+      value="${esc(b.ticket_info || '')}"
+      placeholder="Ex.: Cristo Redentor de van"
+      ${dis}
+    >
 
 
     <label>
