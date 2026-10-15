@@ -2044,8 +2044,9 @@ async function saveBooking(id,sendEmail=false){
     tour_date:v.tour_date,
     tour_time:v.tour_time,
     itinerary:v.itinerary,
-    pax:v.pax,
-    ticket_included:v.ticket_included
+       pax:v.pax,
+    ticket_included:v.ticket_included,
+    ticket_info:val('c_ticket_info').trim()
   }];
   for(const row of document.querySelectorAll('.schedule-row')){
     v.schedule_items.push({
