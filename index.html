@@ -2055,7 +2055,9 @@ async function saveBooking(id,sendEmail=false){
       tour_time:row.querySelector('.schedule-time').value || null,
       itinerary:row.querySelector('.schedule-itinerary').value,
       pax:Number(row.querySelector('.schedule-pax').value) || 1,
-      ticket_included:row.querySelector('.schedule-ticket').checked
+            ticket_included:row.querySelector('.schedule-ticket').checked,
+      ticket_info:row.querySelector('.schedule-ticket-info').value.trim()
+    });
     });
   }
 
