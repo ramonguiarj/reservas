@@ -1994,7 +1994,6 @@ function serviceScheduleRow(item={}){
     <label>Roteiro</label><select class="schedule-itinerary" onchange="applyItineraryPrice()"><option value="">Selecione o roteiro</option>${options}</select>
     <label>Pessoas</label><input class="schedule-pax" type="number" min="1" value="${Number(item.pax || 1)}" onchange="applyItineraryPrice()">
     <label><input class="schedule-ticket" type="checkbox" style="width:auto" ${item.ticket_included ? 'checked' : ''}> Ingresso incluso neste dia</label>
-     <label><input class="schedule-ticket" type="checkbox" style="width:auto" ${item.ticket_included ? 'checked' : ''}> Ingresso incluso neste dia</label>
     <label>Qual ingresso e de onde?</label><input class="schedule-ticket-info" value="${esc(item.ticket_info || '')}" placeholder="Ex.: Cristo Redentor de van">
     <button type="button" class="bad" onclick="this.closest('.schedule-row').remove()">Remover dia</button>
   </div>`;
