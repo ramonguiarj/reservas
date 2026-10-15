@@ -2058,7 +2058,7 @@ async function saveBooking(id,sendEmail=false){
             ticket_included:row.querySelector('.schedule-ticket').checked,
       ticket_info:row.querySelector('.schedule-ticket-info').value.trim()
     });
-    });
+    
   }
 
   if(v.schedule_items.some(item => !item.tour_date || !item.itinerary || item.pax < 1)){
