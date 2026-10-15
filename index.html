@@ -290,6 +290,24 @@ h3{
   overflow-wrap:anywhere
 }
 
+.dashboard-map{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0 0 14px}
+.dashboard-map-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.dashboard-map-head h3{margin:0;color:var(--g)}
+.dashboard-map-head p{margin:2px 0 0;color:var(--mut);font-size:13px}
+.world-map{width:100%;height:auto;min-height:180px;background:#edf5f1;border-radius:8px;display:block}
+.world-land{fill:#c9ded4;stroke:#b0cbbf;stroke-width:1.2}
+.visitor-pin{fill:#a4332b;stroke:#fff;stroke-width:2;cursor:help}
+.visitor-label{fill:#173234;font-size:9px;font-weight:700;paint-order:stroke;stroke:#edf5f1;stroke-width:2px;stroke-linejoin:round}
+.dashboard-actions,.period-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:10px 0}
+.period-tools label{display:block;color:var(--mut);font-size:12px;margin-bottom:3px}
+.period-tools input{width:auto;min-width:140px}
+.client-list{width:100%;border-collapse:collapse;background:#fff;margin:12px 0}
+.client-list th,.client-list td{text-align:left;border-bottom:1px solid var(--line);padding:9px 7px;font-size:13px}
+.client-list th{color:var(--mut);font-size:12px}
+.panel-box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0 0 14px}
+.print-only{display:none}
+@media print{body{background:#fff}.print-only{display:block}header,.tabs,.no-print,.calendar,.dashboard-map{display:none!important}main{max-width:none;padding:0}.panel-box{border:0}.summary-card{border:1px solid #aaa}}
+
 .booking-tabs{display:flex;gap:4px;overflow-x:auto;margin:14px 0 12px;border-bottom:1px solid var(--line);scrollbar-width:thin}
 .booking-actionbar{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
 .booking-actionbar button{padding:7px 10px;font-size:14px}
@@ -455,22 +473,19 @@ const val = id =>
   $('#' + id).value;
 
 function bookingServices(b){
-  if(Array.isArray(b.schedule_items) && b.schedule_items.length){
-    return b.schedule_items.map((item, index) => ({
-      ...item,
-      tour_date: item.tour_date || (index === 0 ? b.tour_date : null),
-      tour_time: item.tour_time || (index === 0 ? b.tour_time : null)
-    }));
-  }
-
+  if(Array.isArray(b.schedule_items) && b.schedule_items.length) return b.schedule_items.map((item,index)=>({
+    ...item,
+    tour_date:item.tour_date || (index===0 ? b.tour_date : null),
+    tour_time:item.tour_time || (index===0 ? b.tour_time : null)
+  }));
   return [{
-    service_id: 'principal',
-    tour_date: b.tour_date,
-    tour_time: b.tour_time,
-    itinerary: b.itinerary,
-    pax: b.pax,
-    ticket_included: b.ticket_included
+    service_id:'principal',tour_date:b.tour_date,tour_time:b.tour_time,
+    itinerary:b.itinerary,pax:b.pax,ticket_included:b.ticket_included
   }];
+}
+
+function qrCodeUrl(value){
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&format=png&data=${encodeURIComponent(value)}`;
 }
 
 
@@ -489,9 +504,10 @@ let googleTokenExpiresAt = 0;
 let calendarMonth = new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedDate = iso(new Date());
 let agendaFilter = {year:String(new Date().getFullYear()),month:String(new Date().getMonth()+1),date:'',status:'todos'};
-let activeTab = 'agenda';
+let activeTab = 'inicio';
 let authMode = 'login';
 let activeBookingTab = 'dados';
+let dashboardYear = new Date().getFullYear();
 
 function accessLevel(){
   return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
@@ -805,10 +821,13 @@ function render(){
     <main>
       ${summaryView()}
       <nav class="tabs" role="tablist" aria-label="Visualização de reservas">
+        <button role="tab" aria-selected="${activeTab === 'inicio'}" onclick="setActiveTab('inicio')">Início</button>
         <button role="tab" aria-selected="${activeTab === 'agenda'}" onclick="setActiveTab('agenda')">Agenda</button>
         <button role="tab" aria-selected="${activeTab === 'reservas'}" onclick="setActiveTab('reservas')">Todas as reservas</button>
+        <button role="tab" aria-selected="${activeTab === 'clientes'}" onclick="setActiveTab('clientes')">Clientes</button>
+        <button role="tab" aria-selected="${activeTab === 'financeiro'}" onclick="setActiveTab('financeiro')">Financeiro</button>
       </nav>
-      ${activeTab === 'agenda' ? `${calendarView()}${dayBookingsView()}` : agendaFiltersView()}
+      ${activeTab === 'inicio' ? dashboardView() : activeTab === 'agenda' ? `${calendarView()}${dayBookingsView()}` : activeTab === 'reservas' ? agendaFiltersView() : activeTab === 'clientes' ? clientsView() : financeView()}
     </main>
   `;
 
@@ -1070,6 +1089,53 @@ function summaryView(){
   `;
 }
 
+const STATE_POINTS={AC:[215,255],AL:[270,277],AP:[240,241],AM:[222,250],BA:[260,275],CE:[270,255],DF:[250,276],ES:[265,291],GO:[246,280],MA:[254,258],MT:[235,279],MS:[240,294],MG:[254,287],PA:[238,258],PB:[274,263],PR:[249,303],PE:[270,268],PI:[259,265],RJ:[260,297],RN:[276,256],RS:[244,322],RO:[224,271],RR:[229,239],SC:[249,312],SP:[252,299],SE:[267,280],TO:[246,267]};
+function clientRecords(){
+  const map=new Map();
+  for(const b of summaryBookings){
+    const key=String(b.client_email||b.client_document||b.client_name||'').trim().toLowerCase();
+    if(!key) continue;
+    const c=map.get(key)||{name:b.client_name||'—',email:b.client_email||'',phone:b.client_phone||'',document:b.client_document||'',state:b.client_state||'',birthday:b.client_birthday||'',reservations:0,lastDate:''};
+    c.reservations++; if((b.tour_date||'')>c.lastDate)c.lastDate=b.tour_date||'';
+    if(b.client_state)c.state=b.client_state;if(b.client_birthday)c.birthday=b.client_birthday;
+    map.set(key,c);
+  }
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+function dashboardView(){
+  const years=[...new Set([new Date().getFullYear(),...summaryBookings.flatMap(b=>bookingServices(b).map(x=>Number(String(x.tour_date||b.tour_date||'').slice(0,4))).filter(Boolean))])].sort((a,b)=>b-a);
+  const yearBookings=summaryBookings.filter(b=>bookingServices(b).some(x=>String(x.tour_date||b.tour_date||'').startsWith(String(dashboardYear))));
+  const visitors=new Set(yearBookings.map(b=>String(b.client_email||b.client_document||b.client_name||'').trim().toLowerCase()).filter(Boolean)).size;
+  const byState={},stateVisitors={}; for(const b of yearBookings){const s=String(b.client_state||'').toUpperCase(),key=String(b.client_email||b.client_document||b.client_name||'').trim().toLowerCase();if(STATE_POINTS[s]&&key){if(!stateVisitors[s])stateVisitors[s]=new Set();stateVisitors[s].add(key)}}
+  for(const [s,people] of Object.entries(stateVisitors))byState[s]=people.size;
+  const pins=Object.entries(byState).map(([s,n])=>{const [x,y]=STATE_POINTS[s];return `<g><title>${s}: ${n} reserva(s)</title><circle class="visitor-pin" cx="${x}" cy="${y}" r="${Math.min(10,5+n)}"/><text class="visitor-label" x="${x+7}" y="${y-6}">${s} · ${n}</text></g>`}).join('');
+  return `<section class="dashboard-map"><div class="dashboard-map-head"><div><h3>De onde vêm seus clientes</h3><p><b>${visitors} visitantes · ${dashboardYear}</b></p></div><select aria-label="Ano do mapa" onchange="dashboardYear=Number(this.value);render()">${years.map(y=>`<option value="${y}" ${y===dashboardYear?'selected':''}>${y}</option>`).join('')}</select></div>
+    <svg class="world-map" viewBox="0 0 800 360" role="img" aria-label="Mapa mundial com pins nos estados de origem dos clientes">
+      <path class="world-land" d="M58 95l30-29 44-13 38 11 24-2 26 17-3 20-23 8-12 22-25 10-15 27-21 13-4 24-17 10-13-22-7-31-16-14-6-25-17-14zM183 219l23-7 28 11 17 24-2 28 15 17-6 30-18 32-13-14-4-31-17-22-10-31zM344 86l28-20 34 3 14 16 27-3 27 11-3 18-25 5-18 15-25 2-8 19-22 7-11-17-22-4-12-20 3-19zM378 165l29-16 30 10 20 19-5 28-17 16-12 30-17 22-17-12-4-26-13-27-2-26zM491 91l36-19 49 5 29 16 47 1 25 17-18 21-31-3-22 14-18-6-16 16-29-1-15-16-25 3-17-16-18 1-18-15zM600 206l24-12 29 8 11 19-18 21-29-5-16-13z"/>
+      ${pins}</svg><div class="dashboard-actions"><button class="alt" onclick="downloadBackup()">Baixar cópia de segurança</button><span style="color:var(--mut);font-size:12px">Inclui reservas e pagamentos da conta. Guarde o arquivo em outro local.</span></div></section>
+    <section class="panel-box"><h3>Reservas de ${dashboardYear}</h3>${yearBookings.length?`<table class="client-list"><thead><tr><th>Cliente</th><th>Passeio</th><th>Data</th><th>Início</th><th>Estado</th></tr></thead><tbody>${[...yearBookings].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).slice(0,8).map(b=>`<tr><td>${esc(b.client_name)}</td><td>${esc(b.itinerary||'—')}</td><td>${dBR(b.tour_date)}</td><td>${esc(String(b.tour_time||'').slice(0,5)||'—')}</td><td>${esc(b.client_state||'—')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma reserva neste ano.</div>'}</section>`;
+}
+function clientsView(){
+  const clients=clientRecords();
+  return `<section class="panel-box"><div class="dashboard-map-head"><div><h3>Cadastro de clientes</h3><p>${clients.length} clientes na sua base. Para completar estado e aniversário, edite uma reserva do cliente.</p></div></div>${clients.length?`<div style="overflow:auto"><table class="client-list"><thead><tr><th>Cliente</th><th>E-mail</th><th>WhatsApp</th><th>Aniversário</th><th>Estado</th><th>Reservas</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${c.birthday?dBR(c.birthday):'—'}</td><td>${esc(c.state||'—')}</td><td>${c.reservations}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Os clientes das reservas aparecerão aqui.</div>'}</section><p class="panel-box">Aniversariantes podem receber uma mensagem automática quando a função de e-mail e o agendamento diário forem ativados no Supabase.</p>`;
+}
+function paymentRows(){
+  const from=$('#finance-from')?.value||'',to=$('#finance-to')?.value||'',rows=[];
+  for(const b of summaryBookings)for(const p of (b.payments||[])){
+    if(p.voided||Number(p.amount||0)<=0)continue;
+    const paidAt=String(p.paid_at||p.created_at||'').slice(0,10);if(!paidAt||(from&&paidAt<from)||(to&&paidAt>to))continue;
+    rows.push({date:paidAt,name:b.client_name||'',email:b.client_email||'',tour:b.itinerary||'',amount:Number(p.amount),method:p.method||'',type:p.payment_type||''});
+  }
+  return rows.sort((a,b)=>a.date.localeCompare(b.date));
+}
+function financeView(){
+ const rows=paymentRows(),total=rows.reduce((s,r)=>s+r.amount,0);
+ return `<section class="panel-box"><h3>Valores recebidos</h3><div class="period-tools no-print"><div><label for="finance-from">De</label><input id="finance-from" type="date" value="${esc($('#finance-from')?.value||'')}" onchange="refreshFinance()"></div><div><label for="finance-to">Até</label><input id="finance-to" type="date" value="${esc($('#finance-to')?.value||'')}" onchange="refreshFinance()"></div><button class="alt" onclick="exportFinanceCSV()">Exportar planilha</button><button class="alt" onclick="window.print()">Salvar em PDF</button></div><p class="print-only">Período: ${esc($('#finance-from')?.value||'início')} a ${esc($('#finance-to')?.value||'hoje')}</p><p><b>${brl(total)}</b> recebidos em ${rows.length} pagamentos</p><div style="overflow:auto"><table class="client-list"><thead><tr><th>Data</th><th>Cliente</th><th>Passeio</th><th>Forma</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${dBR(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.tour)}</td><td>${esc(r.method)}</td><td>${esc(r.type)}</td><td>${brl(r.amount)}</td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<div class="empty">Nenhum pagamento recebido neste período.</div>'}</section>`;
+}
+function refreshFinance(){const f=$('#finance-from')?.value||'',t=$('#finance-to')?.value||'';render();requestAnimationFrame(()=>{if($('#finance-from'))$('#finance-from').value=f;if($('#finance-to'))$('#finance-to').value=t;});}
+function exportFinanceCSV(){const rows=paymentRows(),csv=[['Data','Cliente','E-mail','Passeio','Forma','Tipo','Valor'],...rows.map(r=>[dBR(r.date),r.name,r.email,r.tour,r.method,r.type,r.amount.toFixed(2).replace('.',',')])].map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='valores-recebidos.csv';a.click();URL.revokeObjectURL(a.href);}
+async function downloadBackup(){if(me?.role!=='owner')return alert('Somente a administradora pode baixar a cópia de segurança.');const {data,error}=await db.from('bookings').select('*, payments(*)').eq('account_id',acc.id).order('created_at');if(error)return alert('Não foi possível criar a cópia de segurança: '+error.message);const payload={exported_at:new Date().toISOString(),account:acc?.name||'',bookings:data||[]};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=`backup-reservas-${iso(new Date())}.json`;a.click();URL.revokeObjectURL(a.href);}
+
 
 // ===============================
 // ABRIR RESERVA
@@ -1246,27 +1312,49 @@ async function openBooking(id){
 
     <label for="c_tel">
       WhatsApp (opcional)
-  <div class="row">
-  <div>
-    <label for="c_state">Estado de origem do cliente</label>
-    <select id="c_state" ${dis}>
-      <option value="">Selecione</option>
-      ${['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
-        .map(s => `<option value="${s}" ${b.client_state === s ? 'selected' : ''}>${s}</option>`)
-        .join('')}
-    </select>
-  </div>
+    </label>
 
-  <div>
-    <label for="c_birthday">Data de aniversário</label>
     <input
-      id="c_birthday"
-      type="date"
-      value="${esc(b.client_birthday || '')}"
+      id="c_tel"
+      value="${esc(b.client_phone)}"
+      inputmode="tel"
       ${dis}
     >
-  </div>
-</div>
+
+    <div class="row">
+      <div>
+        <label for="c_state">Estado de origem do cliente</label>
+        <select id="c_state" ${dis}>
+          <option value="">Selecione</option>
+          ${['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(s=>`<option value="${s}" ${b.client_state===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label for="c_birthday">Data de aniversário</label>
+        <input id="c_birthday" type="date" value="${esc(b.client_birthday||'')}" ${dis}>
+      </div>
+    </div>
+
+
+    <div class="row">
+
+      <div>
+
+        <label for="c_dt">
+          Data
+        </label>
+
+        <input
+          id="c_dt"
+          type="date"
+          value="${b.tour_date}"
+          ${dis}
+        >
+
+      </div>
+
+
+      <div>
 
         <label for="c_hr">
           Hora
@@ -1432,7 +1520,15 @@ async function openBooking(id){
     <label><input type="checkbox" id="v_iphone" style="width:auto" ${b.voucher_options?.iphone_photos ? 'checked' : ''} ${dis}> Fotos de iPhone</label>
     <label><input type="checkbox" id="v_camera" style="width:auto" ${b.voucher_options?.camera_photos ? 'checked' : ''} ${dis}> Fotos de câmera</label>
 
-    <section class="section"><h2>Transporte e horário de início</h2><div class="content">${hasTransport ? '<b>Transporte incluso:</b> a busca será na hospedagem informada ou no ponto de encontro combinado.\n' : ''}<b>Início do tour:</b>\n${esc(services.map(item => `${dBR(item.tour_date)} · ${item.tour_time ? String(item.tour_time).slice(0,5) : 'A confirmar'}`).join('\n'))}\n\n<b>Endereço e ponto de encontro:</b>\n${esc(pickup)}</div></section>
+    <label for="c_pickup">
+      Endereço ou ponto de encontro / busca
+    </label>
+    <textarea
+      id="c_pickup"
+      rows="2"
+      placeholder="Ex.: nome e endereço da hospedagem ou ponto combinado"
+      ${dis}
+    >${esc(b.pickup_location)}</textarea>
 
     <label for="c_client_message">
       Informação para o cliente (aparece no voucher)
@@ -1857,17 +1953,7 @@ function configureBookingTabs(id,booking){
   const nav=document.createElement('nav');nav.className='booking-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Seções da reserva');
   nav.innerHTML=tabs.map(([key,label])=>`<button type="button" role="tab" aria-selected="${key==='dados'}" onclick="setBookingTab('${key}',this)">${label}</button>`).join('');
   const actionbar=document.createElement('div');actionbar.className='booking-actionbar';
- actionbar.innerHTML=`
-  ${canManage()?`
-    <button type="button" class="alt" onclick="editBookingFromToolbar()">Editar reserva</button>
-    <button type="button" class="bad" onclick="deleteBooking('${id}')">Excluir reserva</button>
-  `:''}
-  ${canAdd()?`<button type="button" class="alt" onclick="sendBookingVoucher('${id}')">Enviar voucher por e-mail</button>`:''}
-  <button type="button" class="alt" onclick="sendBookingVoucherWhatsApp('${id}')">Enviar voucher por WhatsApp</button>
-  <button type="button" class="alt" onclick="voucher('${id}')">Voucher</button>
-  <button type="button" class="alt" onclick="voucher('${id}',true)">Voucher sem valores</button>
-  ${booking.status==='aberta'&&canManage()?`<button type="button" class="lime" onclick="setStatus('${id}','finalizada')">Finalizar</button>`:''}
-`;
+  actionbar.innerHTML=`${canManage()?'<button type="button" class="alt" onclick="editBookingFromToolbar()">Editar reserva</button>':''}${canAdd()?`<button type="button" class="alt" onclick="sendBookingVoucher('${id}')">Enviar voucher por e-mail</button>`:''}<button type="button" class="alt" onclick="sendBookingVoucherWhatsApp('${id}')">Enviar voucher por WhatsApp</button><button type="button" class="alt" onclick="voucher('${id}')">Voucher</button><button type="button" class="alt" onclick="voucher('${id}',true)">Voucher sem valores</button>${booking.status==='aberta'&&canManage()?`<button type="button" class="lime" onclick="setStatus('${id}','finalizada')">Finalizar</button>`:''}`;
   for(const button of Array.from(dlg.querySelectorAll('button'))){
     if(button.textContent.trim()==='Visualizar voucher' || button.textContent.trim()==='Finalizar reserva') button.remove();
   }
@@ -1919,6 +2005,8 @@ async function saveBooking(id,sendEmail=false){
     client_phone:val('c_tel').trim(),
     client_email:val('c_email').trim(),
     client_document:val('c_doc').trim(),
+    client_state:val('c_state') || null,
+    client_birthday:val('c_birthday') || null,
     tour_date:val('c_dt'),
     tour_time:val('c_hr') || null,
     itinerary:val('c_it'),
@@ -2059,29 +2147,17 @@ async function saveBooking(id,sendEmail=false){
 
 async function deleteBooking(id){
   if(!canManage()) return alert('Seu nível de acesso não permite excluir reservas.');
-
   const booking = bookings.find(item => item.id === id);
-
+  if(Object.keys(booking?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())) return alert('Esta reserva tem evento no Google Agenda. Abra Equipe e conecte o Google antes de excluir, para remover o evento também.');
   if(!confirm(`Excluir a reserva ${booking?.booking_code || ''}? Ela sairá da agenda e será ocultada, mas ficará preservada no banco.`)) return;
-
-  const {error} = await db
-    .from('bookings')
-    .update({deleted_at:new Date().toISOString()})
-    .eq('id',id)
-    .eq('account_id',acc.id);
-
+  if(googleAccessToken && googleTokenExpiresAt > Date.now()){
+    try{ await removeGoogleEvents(booking); }
+    catch(error){ return alert('Não consegui remover o evento do Google Agenda; a reserva continua na agenda. ' + error.message); }
+  }
+  const {error} = await db.from('bookings').update({deleted_at:new Date().toISOString()}).eq('id',id).eq('account_id',acc.id);
   if(error) return alert('Não foi possível excluir a reserva: ' + error.message);
-
   $('#dlg').close();
   await load();
-
-  if(booking && googleAccessToken && googleTokenExpiresAt > Date.now()){
-    try{
-      await removeGoogleEvents(booking);
-    }catch(error){
-      console.warn('Reserva excluída no app, mas o evento ainda está no Google Agenda.', error);
-    }
-  }
 }
 
 
@@ -2209,6 +2285,11 @@ async function setStatus(id,s){
 
   if(!canManage()) return alert('Seu nível de acesso não permite alterar o status da reserva.');
 
+  const before=bookings.find(item => item.id === id);
+  if(s === 'cancelada' && Object.keys(before?.google_event_ids || {}).length && (!googleAccessToken || googleTokenExpiresAt <= Date.now())){
+    return alert('Esta reserva tem evento no Google Agenda. Conecte o Google em Equipe antes de cancelar, para remover o evento também.');
+  }
+
   if(
     !confirm(
       'Confirmar: ' + s + '?'
@@ -2327,7 +2408,7 @@ function voucher(id,hideValues=false){
       <img class="hero" src="${welcomeImage}" alt="Parabéns! Rio de Janeiro. Juntos vamos conhecer a cidade mais bonita do mundo.">
       <section class="section"><h2>Informações da reserva</h2><div class="content">${esc(serviceDetails)}</div></section>
       ${voucherBenefits.length ? `<section class="section"><h2>Itens inclusos</h2><div class="content">${esc(voucherBenefits.join('\n'))}</div></section>` : ''}
-      <section class="section"><h2>Endereço e ponto de encontro</h2><div class="content">${hasTransport ? '<b>Transporte incluso:</b> a busca será na hospedagem informada ou no ponto de encontro combinado.\n' : ''}${esc(pickup)}</div></section>
+      <section class="section"><h2>Transporte e horário de início</h2><div class="content">${hasTransport ? '<b>Transporte incluso:</b> a busca será na hospedagem informada ou no ponto de encontro combinado.\n' : ''}<b>Início do tour:</b>\n${esc(services.map(item=>`${dBR(item.tour_date)} · ${item.tour_time?String(item.tour_time).slice(0,5):'A confirmar'}`).join('\n'))}\n\n<b>Endereço e ponto de encontro:</b>\n${esc(pickup)}</div></section>
       ${hideValues ? '' : `<section class="section"><h2>Pagamento</h2><div class="content"><b>Valor total:</b> ${brl(b.total)}\n<b>Sinal e pagamentos recebidos:</b> ${brl(paid(b))}\n<b>Saldo em aberto:</b> ${brl(open)}</div></section>`}
 
 
