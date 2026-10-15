@@ -2386,9 +2386,7 @@ function voucher(id,hideValues=false){
   const firstName = String(b.client_name || '').trim().split(/\s+/)[0] || 'cliente';
   const locator = String(b.booking_code || b.id || '');
   const qrUrl = qrCodeUrl(locator);
-  const serviceDetails = services.map(item => `${dBR(item.tour_date)}${item.tour_time ? ' às ' + String(item.tour_time).slice(0,5) : ''} · ${item.itinerary} · ${item.pax} pessoa(s) · ingresso ${item.ticket_included ? 'incluso' : 'não incluso'}`).join('\n');
-
-
+    const serviceDetails = services.map(item => `${dBR(item.tour_date)}${item.tour_time ? ' às ' + String(item.tour_time).slice(0,5) : ''} · ${item.itinerary} · ${item.pax} pessoa(s)`).join('\n');
   const w =
     window.open(
       '',
