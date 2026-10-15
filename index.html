@@ -455,15 +455,22 @@ const val = id =>
   $('#' + id).value;
 
 function bookingServices(b){
-  if(Array.isArray(b.schedule_items) && b.schedule_items.length) return b.schedule_items;
-  return [{
-    service_id:'principal',tour_date:b.tour_date,tour_time:b.tour_time,
-    itinerary:b.itinerary,pax:b.pax,ticket_included:b.ticket_included
-  }];
-}
+  if(Array.isArray(b.schedule_items) && b.schedule_items.length){
+    return b.schedule_items.map((item, index) => ({
+      ...item,
+      tour_date: item.tour_date || (index === 0 ? b.tour_date : null),
+      tour_time: item.tour_time || (index === 0 ? b.tour_time : null)
+    }));
+  }
 
-function qrCodeUrl(value){
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&format=png&data=${encodeURIComponent(value)}`;
+  return [{
+    service_id: 'principal',
+    tour_date: b.tour_date,
+    tour_time: b.tour_time,
+    itinerary: b.itinerary,
+    pax: b.pax,
+    ticket_included: b.ticket_included
+  }];
 }
 
 
