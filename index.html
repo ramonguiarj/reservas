@@ -2372,7 +2372,9 @@ function voucher(id,hideValues=false){
   const services = bookingServices(b);
   const options = b.voucher_options || {};
   const hasTransport = Boolean(options.transport) || services.some(item => itineraryCache.find(i => i.name === item.itinerary)?.transport_included) || Boolean(itinerary?.transport_included);
+  const ticketItems = services.filter(item => item.ticket_included).map(item => `Ingresso incluso: ${item.ticket_info || item.itinerary}`);
   const voucherBenefits = [
+    ...ticketItems,
     hasTransport && 'Transporte incluso',
     options.breakfast && 'Café da manhã incluso',
     options.iphone_photos && 'Fotos de iPhone',
