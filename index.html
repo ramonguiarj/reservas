@@ -1246,35 +1246,27 @@ async function openBooking(id){
 
     <label for="c_tel">
       WhatsApp (opcional)
-    </label>
+  <div class="row">
+  <div>
+    <label for="c_state">Estado de origem do cliente</label>
+    <select id="c_state" ${dis}>
+      <option value="">Selecione</option>
+      ${['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+        .map(s => `<option value="${s}" ${b.client_state === s ? 'selected' : ''}>${s}</option>`)
+        .join('')}
+    </select>
+  </div>
 
+  <div>
+    <label for="c_birthday">Data de aniversário</label>
     <input
-      id="c_tel"
-      value="${esc(b.client_phone)}"
-      inputmode="tel"
+      id="c_birthday"
+      type="date"
+      value="${esc(b.client_birthday || '')}"
       ${dis}
     >
-
-
-    <div class="row">
-
-      <div>
-
-        <label for="c_dt">
-          Data
-        </label>
-
-        <input
-          id="c_dt"
-          type="date"
-          value="${b.tour_date}"
-          ${dis}
-        >
-
-      </div>
-
-
-      <div>
+  </div>
+</div>
 
         <label for="c_hr">
           Hora
