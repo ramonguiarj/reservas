@@ -3239,31 +3239,27 @@ async function connectGoogleCalendar(){
 // PREÇO DO ITINERÁRIO
 // ===============================
 
-function applyItineraryPrice(){
+function applyItineraryPrice(el){
+  const row = el && el.closest ? el.closest('.schedule-row') : null;
 
-  const select =
-    $('#c_it');
-
-  const option =
-    select.options[
-      select.selectedIndex
-    ];
-
-
-  if(
-    !option ||
-    !option.value
-  ){
-    return;
+  if(row){
+    // roteiro adicional: recalcula só o valor deste bloco
+    const option = row.querySelector('.schedule-itinerary').selectedOptions[0];
+    const pax = Number(row.querySelector('.schedule-pax').value) || 1;
+    if(option && option.value){
+      row.querySelector('.schedule-total').value = (Number(option.dataset.price || 0) * pax).toFixed(2);
+    }
+  }else{
+    // roteiro principal
+    const option = $('#c_it').selectedOptions[0];
+    const pax = Number($('#c_px').value) || 1;
+    if(option && option.value){
+      $('#c_tt').value = (Number(option.dataset.price || 0) * pax).toFixed(2);
+    }
   }
 
-
-  let total = Number(option.dataset.price || 0) * (Number($('#c_px').value) || 1);
-  for(const row of document.querySelectorAll('.schedule-row')){
-    const selected=row.querySelector('.schedule-itinerary')?.selectedOptions[0];
-    total += Number(selected?.dataset.price || 0) * (Number(row.querySelector('.schedule-pax')?.value) || 1);
-  }
-  if(total > 0) $('#c_tt').value=total.toFixed(2);
+  updateGrandTotal();
+}
 }
 
 
