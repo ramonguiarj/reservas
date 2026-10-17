@@ -2073,15 +2073,62 @@ function toggleInstallments(){
 }
 
 function serviceScheduleRow(item={}){
+  const isNew = !item.service_id;
   const serviceId = item.service_id || crypto.randomUUID();
+  const opt = item.options || {};
   const options = itineraryCache.map(i => `<option value="${esc(i.name)}" data-price="${Number(i.price || 0)}" ${item.itinerary === i.name ? 'selected' : ''}>${esc(i.name)} · ${brl(i.price)} / pessoa</option>`).join('');
+
+  const signalBlock = isNew ? `
+    <h4 style="margin:14px 0 0">Sinal deste roteiro</h4>
+    <label>Valor do sinal pago (R$)</label>
+    <input class="schedule-signal" type="number" step="0.01" min="0" value="0" oninput="toggleRowInstallments(this)">
+    <label>Forma de pagamento do sinal</label>
+    <select class="schedule-signal-method" onchange="toggleRowInstallments(this)">
+      <option value="Pix">Pix</option>
+      <option value="Cartão de crédito">Cartão de crédito</option>
+      <option value="Transferência">Transferência</option>
+      <option value="Dinheiro">Dinheiro em espécie</option>
+    </select>
+    <div class="schedule-signal-inst" style="display:none">
+      <label>Parcelas no cartão de crédito</label>
+      <input class="schedule-signal-installments" type="number" min="1" step="1" value="1">
+    </div>
+    <label>Data do pagamento</label>
+    <input class="schedule-signal-date" type="date" value="${iso(new Date())}">
+  ` : `<p class="m">Os pagamentos deste roteiro ficam na aba Financeiro.</p>`;
+
   return `<div class="schedule-row" data-service-id="${esc(serviceId)}" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0">
-    <div class="row"><div><label>Data</label><input class="schedule-date" type="date" value="${esc(item.tour_date || selectedDate)}"></div><div><label>Hora</label><input class="schedule-time" type="time" value="${esc((item.tour_time || '').slice(0,5))}"></div></div>
-    <label>Roteiro</label><select class="schedule-itinerary" onchange="applyItineraryPrice()"><option value="">Selecione o roteiro</option>${options}</select>
-    <label>Pessoas</label><input class="schedule-pax" type="number" min="1" value="${Number(item.pax || 1)}" onchange="applyItineraryPrice()">
-    <label><input class="schedule-ticket" type="checkbox" style="width:auto" ${item.ticket_included ? 'checked' : ''}> Ingresso incluso neste dia</label>
-    <label>Qual ingresso e de onde?</label><input class="schedule-ticket-info" value="${esc(item.ticket_info || '')}" placeholder="Ex.: Cristo Redentor de van">
-    <button type="button" class="bad" onclick="this.closest('.schedule-row').remove()">Remover dia</button>
+    <div class="row">
+      <div><label>Data</label><input class="schedule-date" type="date" value="${esc(item.tour_date || selectedDate)}"></div>
+      <div><label>Hora</label><input class="schedule-time" type="time" value="${esc((item.tour_time || '').slice(0,5))}"></div>
+    </div>
+
+    <label>Roteiro</label>
+    <select class="schedule-itinerary" onchange="applyItineraryPrice(this)">
+      <option value="">Selecione um itinerário</option>${options}
+    </select>
+
+    <div class="row">
+      <div><label>Pessoas</label><input class="schedule-pax" type="number" min="1" value="${Number(item.pax || 1)}" onchange="applyItineraryPrice(this)"></div>
+      <div><label>Valor total deste roteiro (R$)</label><input class="schedule-total" type="number" step="0.01" min="0" value="${Number(item.service_total || 0)}" oninput="updateGrandTotal()"></div>
+    </div>
+
+    <label><input class="schedule-ticket" type="checkbox" style="width:auto" ${item.ticket_included ? 'checked' : ''}> Ingresso incluso</label>
+    <label>Ingresso incluso: qual e de onde? (aparece no voucher)</label>
+    <input class="schedule-ticket-info" value="${esc(item.ticket_info || '')}" placeholder="Ex.: Cristo Redentor de van">
+    <label><input class="schedule-ticket-bought" type="checkbox" style="width:auto" ${item.ticket_bought ? 'checked' : ''}> Ingresso já comprado</label>
+
+    <label><input class="schedule-transport" type="checkbox" style="width:auto" ${opt.transport ? 'checked' : ''}> Transporte incluso</label>
+    <label><input class="schedule-breakfast" type="checkbox" style="width:auto" ${opt.breakfast ? 'checked' : ''}> Café da manhã incluso</label>
+    <label><input class="schedule-iphone" type="checkbox" style="width:auto" ${opt.iphone_photos ? 'checked' : ''}> Fotos de iPhone</label>
+    <label><input class="schedule-camera" type="checkbox" style="width:auto" ${opt.camera_photos ? 'checked' : ''}> Fotos de câmera</label>
+
+    <label>Endereço ou ponto de encontro / busca deste dia</label>
+    <textarea class="schedule-pickup" rows="2" placeholder="Ex.: nome e endereço da hospedagem ou ponto combinado">${esc(item.pickup || '')}</textarea>
+
+    ${signalBlock}
+
+    <button type="button" class="bad" style="margin-top:10px" onclick="this.closest('.schedule-row').remove();updateGrandTotal()">Remover dia</button>
   </div>`;
 }
 
@@ -2089,6 +2136,25 @@ function addScheduleItem(){
   const host = $('#extra-schedule-items');
   if(!host) return;
   host.insertAdjacentHTML('beforeend',serviceScheduleRow({tour_date:val('c_dt') || selectedDate,pax:Number(val('c_px')) || 1}));
+  updateGrandTotal();
+}
+
+function toggleRowInstallments(el){
+  const row = el.closest('.schedule-row');
+  const amount = Number(row.querySelector('.schedule-signal').value || 0);
+  const method = row.querySelector('.schedule-signal-method').value;
+  row.querySelector('.schedule-signal-inst').style.display = (amount > 0 && method === 'Cartão de crédito') ? 'block' : 'none';
+}
+
+function updateGrandTotal(){
+  const box = $('#booking-grand-total');
+  if(!box) return;
+  let total = Number($('#c_tt')?.value) || 0;
+  for(const row of document.querySelectorAll('.schedule-row')){
+    total += Number(row.querySelector('.schedule-total').value) || 0;
+  }
+  box.innerHTML = `<strong>Total geral da reserva</strong>${brl(total)}`;
+}
 }
 
 
