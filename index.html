@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Reservas</title>
+<title>Reservas Ramon Guia</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -510,12 +510,12 @@ let activeBookingTab = 'dados';
 let dashboardYear = new Date().getFullYear();
 
 function accessLevel(){
-  return me?.role === 'owner' ? 'total' : (me?.access_level || 'total');
+  return me?.role === 'owner' ? 'total' : (me?.access_level || 'visualizar');
 }
 function canAdd(){ return ['adicionar','total'].includes(accessLevel()); }
 function canManage(){ return accessLevel() === 'total'; }
 function accessLabel(level){
-  return ({visualizar:'Visualizar',adicionar:'Adicionar',total:'Total'})[level] || 'Total';
+  return ({visualizar:'Visualizar',adicionar:'Adicionar',total:'Total'})[level] || 'Visualizar';
 }
 
 
@@ -1112,7 +1112,7 @@ function dashboardView(){
   return `<section class="dashboard-map"><div class="dashboard-map-head"><div><h3>De onde vêm seus clientes</h3><p><b>${visitors} visitantes · ${dashboardYear}</b></p></div><select aria-label="Ano do mapa" onchange="dashboardYear=Number(this.value);render()">${years.map(y=>`<option value="${y}" ${y===dashboardYear?'selected':''}>${y}</option>`).join('')}</select></div>
     <svg class="world-map" viewBox="0 0 800 360" role="img" aria-label="Mapa mundial com pins nos estados de origem dos clientes">
       <path class="world-land" d="M58 95l30-29 44-13 38 11 24-2 26 17-3 20-23 8-12 22-25 10-15 27-21 13-4 24-17 10-13-22-7-31-16-14-6-25-17-14zM183 219l23-7 28 11 17 24-2 28 15 17-6 30-18 32-13-14-4-31-17-22-10-31zM344 86l28-20 34 3 14 16 27-3 27 11-3 18-25 5-18 15-25 2-8 19-22 7-11-17-22-4-12-20 3-19zM378 165l29-16 30 10 20 19-5 28-17 16-12 30-17 22-17-12-4-26-13-27-2-26zM491 91l36-19 49 5 29 16 47 1 25 17-18 21-31-3-22 14-18-6-16 16-29-1-15-16-25 3-17-16-18 1-18-15zM600 206l24-12 29 8 11 19-18 21-29-5-16-13z"/>
-      ${pins}</svg><div class="dashboard-actions"><button class="alt" onclick="downloadBackup()">Baixar cópia de segurança</button><span style="color:var(--mut);font-size:12px">Inclui reservas e pagamentos da conta. Guarde o arquivo em outro local.</span></div></section>
+      ${pins}</svg><div class="dashboard-actions"><button class="alt" onclick="downloadBackup()">Baixar cópia de segurança</button><span style="color:var(--mut);font-size:12px">Inclui reservas, pagamentos, roteiros, equipe e histórico. Guarde o arquivo em local seguro.</span></div></section>
     <section class="panel-box"><h3>Reservas de ${dashboardYear}</h3>${yearBookings.length?`<table class="client-list"><thead><tr><th>Cliente</th><th>Passeio</th><th>Data</th><th>Início</th><th>Estado</th></tr></thead><tbody>${[...yearBookings].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).slice(0,8).map(b=>`<tr><td>${esc(b.client_name)}</td><td>${esc(b.itinerary||'—')}</td><td>${dBR(b.tour_date)}</td><td>${esc(String(b.tour_time||'').slice(0,5)||'—')}</td><td>${esc(b.client_state||'—')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma reserva neste ano.</div>'}</section>`;
 }
 function clientsView(){
@@ -1134,7 +1134,57 @@ function financeView(){
 }
 function refreshFinance(){const f=$('#finance-from')?.value||'',t=$('#finance-to')?.value||'';render();requestAnimationFrame(()=>{if($('#finance-from'))$('#finance-from').value=f;if($('#finance-to'))$('#finance-to').value=t;});}
 function exportFinanceCSV(){const rows=paymentRows(),csv=[['Data','Cliente','E-mail','Passeio','Forma','Tipo','Valor'],...rows.map(r=>[dBR(r.date),r.name,r.email,r.tour,r.method,r.type,r.amount.toFixed(2).replace('.',',')])].map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='valores-recebidos.csv';a.click();URL.revokeObjectURL(a.href);}
-async function downloadBackup(){if(me?.role!=='owner')return alert('Somente a administradora pode baixar a cópia de segurança.');const {data,error}=await db.from('bookings').select('*, payments(*)').eq('account_id',acc.id).order('created_at');if(error)return alert('Não foi possível criar a cópia de segurança: '+error.message);const payload={exported_at:new Date().toISOString(),account:acc?.name||'',bookings:data||[]};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=`backup-reservas-${iso(new Date())}.json`;a.click();URL.revokeObjectURL(a.href);}
+async function backupSha256(text){
+  const bytes=new TextEncoder().encode(text);
+  const digest=await crypto.subtle.digest('SHA-256',bytes);
+  return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function collectAccountBackup(client,accountId,onProgress=()=>{}){
+  const result=await client.rpc('get_account_backup_manifest',{p_account_id:accountId});
+  if(result.error) throw new Error(result.error.message);
+  const manifest=result.data;
+  const allowed=['accounts','members','invites','itineraries','bookings','payments','audit_log','birthday_email_log','booking_save_requests'];
+  if(manifest?.format!=='ramon-guia-business-backup' || manifest.version!==2 || manifest.account_id!==accountId || !Array.isArray(manifest.tables) || manifest.tables.length!==allowed.length) throw new Error('Manifesto da cópia inválido.');
+  const tables={},seenTables=new Set();
+  for(const info of manifest.tables){
+    if(!allowed.includes(info.name) || seenTables.has(info.name) || !Number.isSafeInteger(info.count) || info.count<0) throw new Error('Tabela ou contagem da cópia inválida.');
+    seenTables.add(info.name);
+    const rows=[],hashes=[],keys=new Set(); let cursor=null;
+    do{
+      const page=await client.rpc('get_account_backup_page',{p_account_id:accountId,p_table:info.name,p_after:cursor,p_limit:200});
+      if(page.error) throw new Error(page.error.message);
+      if(!Array.isArray(page.data) || page.data.length>200) throw new Error('Página da cópia inválida.');
+      if(!page.data.length) break;
+      for(const row of page.data){
+        if(typeof row.row_key!=='string' || typeof row.row_text!=='string' || keys.has(row.row_key)) throw new Error('Página repetida ou registro inválido na cópia.');
+        const data=JSON.parse(row.row_text);
+        if(!data || Array.isArray(data) || typeof data!=='object') throw new Error('Conteúdo da cópia inválido.');
+        keys.add(row.row_key); rows.push(row.row_text); hashes.push(await backupSha256(row.row_text));
+      }
+      cursor=page.data[page.data.length-1].row_key;
+      if(rows.length>info.count) throw new Error('Os dados mudaram durante a exportação. Gere a cópia novamente.');
+      onProgress(info.name,rows.length,info.count);
+    }while(rows.length<info.count);
+    if(rows.length!==info.count || await backupSha256(hashes.join(''))!==info.sha256) throw new Error('A conferência da cópia falhou ou os dados mudaram. Gere a cópia novamente.');
+    tables[info.name]=rows;
+  }
+  return {format:manifest.format,version:2,account_id:accountId,exported_at:manifest.exported_at,encoding:'postgres-jsonb-text',manifest:manifest.tables,tables};
+}
+let accountBackupInProgress=false;
+async function downloadBackup(){
+  if(me?.role!=='owner') return alert('Somente o proprietário pode baixar a cópia de segurança.');
+  if(accountBackupInProgress) return;
+  accountBackupInProgress=true;
+  try{
+    const payload=await collectAccountBackup(db,acc.id);
+    const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=`backup-reservas-${iso(new Date())}.json`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    alert('Cópia dos dados da conta conferida e enviada para Downloads. Guarde o arquivo em outro local seguro.');
+  }catch(error){alert('Não foi possível concluir a cópia: '+error.message);}
+  finally{accountBackupInProgress=false;}
+}
+
 
 
 // ===============================
@@ -1209,6 +1259,12 @@ function detectPhoneOrigin(){
   state.value = origin.state;
 }
 async function openBooking(id){
+  if(readPendingBookingSave()){
+    $('#dlg').innerHTML = `<h3>Salvamento aguardando confirmação</h3><p>Confira a tentativa anterior antes de iniciar outra reserva ou edição.</p><button onclick="saveBooking()">Verificar salvamento</button><button class="alt" onclick="document.querySelector('#dlg').close()">Fechar</button>`;
+    $('#dlg').showModal();
+    return;
+  }
+
 
   let b = id
     ? bookings.find(x => x.id === id)
@@ -1976,6 +2032,12 @@ async function openBooking(id){
 
   $('#dlg').innerHTML = h;
 
+  if(locked){
+    $('#dlg').querySelectorAll('[id^="c_"],[id^="v_"],.schedule-row input,.schedule-row select,.schedule-row textarea,.schedule-row button').forEach(input=>{input.disabled=true;});
+    const addExtra=$('#dlg').querySelector('button[onclick="addScheduleItem()"]');
+    if(addExtra) addExtra.disabled=true;
+  }
+  $('#dlg').dataset.writeVersion = id ? String(b.write_version ?? '') : '';
   if(id) configureBookingTabs(id,b);
 
   updateGrandTotal();
@@ -2139,20 +2201,107 @@ function toggleRowInstallments(el){
 }
 
 function updateGrandTotal(){
-  const box = $('#booking-grand-total');
-  if(!box) return;
-  let total = Number($('#c_tt')?.value) || 0;
-  for(const row of document.querySelectorAll('.schedule-row')){
-    total += Number(row.querySelector('.schedule-total').value) || 0;
-  }
-  box.innerHTML = `<strong>Total geral da reserva</strong>${brl(total)}`;
+  const box=$('#booking-grand-total'); if(!box) return;
+  try{
+    let cents=moneyCents($('#c_tt')?.value);
+    for(const row of document.querySelectorAll('.schedule-row')) cents+=moneyCents(row.querySelector('.schedule-total').value);
+    box.innerHTML=`<strong>Total geral da reserva</strong>${brl(cents/100)}`;
+  }catch(error){box.textContent=error.message;}
 }
 
-
+// Convert decimal input to integer cents before adding or comparing money.
+function moneyCents(value){
+  const raw=String(value ?? '').trim();
+  if(raw==='') return 0;
+  if(!/^\d+(?:\.\d{1,2})?$/.test(raw)) throw new Error('Use valores positivos com até duas casas decimais.');
+  const [whole,fraction='']=raw.split('.');
+  const cents=Number(whole)*100+Number(fraction.padEnd(2,'0'));
+  if(!Number.isSafeInteger(cents) || cents>9999999999) throw new Error('Valor fora do limite permitido.');
+  return cents;
+}
+function pendingBookingKey(){
+  if(!acc?.id || !me?.user_id) throw new Error('Faça login novamente antes de salvar.');
+  return `booking-pending:${acc.id}:${me.user_id}`;
+}
+function readPendingBookingSave(){
+  const raw=sessionStorage.getItem(pendingBookingKey());
+  if(!raw) return null;
+  const pending=JSON.parse(raw);
+  if(pending.args?.p_account_id!==acc.id || !pending.args?.p_request_id) throw new Error('Tentativa pendente inválida.');
+  return pending;
+}
+function definitiveBookingError(result){
+  const code=String(result.error?.code || '');
+  return /^([0-9A-Z]{5}|PGRST\d+)$/.test(code) && code!=='PGRST000' && code!=='PGRST001' && code!=='PGRST002' && code!=='PGRST003';
+}
+async function submitPendingBooking(pending){
+  const result=await db.rpc(pending.kind==='payment' ? 'add_payment_atomic' : 'save_booking_atomic',pending.args);
+  if(result.error){
+    if(definitiveBookingError(result)) sessionStorage.removeItem(pendingBookingKey());
+    if(result.error.code==='40001') throw new Error('Outra pessoa ou aba alterou a reserva. Reabra a reserva antes de editar.');
+    if(result.error.code==='PGRST202') throw new Error('A atualização do banco ainda não foi instalada. Use a versão anterior até concluir a preparação.');
+    throw new Error(result.error.message || 'Resultado ainda não confirmado. Use Verificar salvamento antes de tentar outra operação.');
+  }
+  if(!result.data?.id || !Number.isInteger(Number(result.data.write_version))) throw new Error('Resposta incompleta. Verifique o salvamento pendente.');
+  sessionStorage.removeItem(pendingBookingKey());
+  return result.data.id;
+}
+async function finishBookingSave(bookingId,sendEmail,kind){
+  $('#dlg').close();
+  await load();
+  if(kind==='payment'){await openBooking(bookingId);return;}
+  if(googleAccessToken && googleTokenExpiresAt>Date.now()){
+    const savedBooking=bookings.find(item=>item.id===bookingId);
+    if(savedBooking){
+      try{await syncGoogleBooking(savedBooking);}
+      catch(error){alert('Reserva salva, mas a sincronização com o Google Agenda falhou: '+error.message);}
+    }
+  }else if(acc.google_calendar_client_id){
+    alert('Reserva salva. Para sincronizar com o Google Agenda, abra Equipe e conecte novamente.');
+  }
+  if(sendEmail) await sendBookingVoucher(bookingId);
+}
+let bookingSaveInProgress=false;
 async function saveBooking(id,sendEmail=false){
+  if(bookingSaveInProgress) return;
+  bookingSaveInProgress=true;
+  try{
+    const pending=readPendingBookingSave();
+    if(pending){
+      const bookingId=await submitPendingBooking(pending);
+      await finishBookingSave(bookingId,pending.sendEmail,pending.kind);
+      return;
+    }
+    return await persistBooking(id,sendEmail);
+  }catch(error){
+    alert('Salvamento não concluído ou ainda não confirmado: '+error.message);
+  }finally{bookingSaveInProgress=false;}
+}
+
+async function persistBooking(id,sendEmail=false){
 
   if(id && !canManage()) return alert('Seu nível de acesso não permite editar reservas existentes.');
   if(!id && !canAdd()) return alert('Seu nível de acesso não permite criar reservas.');
+
+  // Validate raw inputs before numeric fallbacks can hide invalid values.
+  const rows = [...document.querySelectorAll('.schedule-row')];
+  const moneyInputs = [$('#c_tt'), $('#c_signal'), ...rows.flatMap(row =>
+    [row.querySelector('.schedule-total'), row.querySelector('.schedule-signal')])].filter(Boolean);
+  if(moneyInputs.some(input => input.validity?.badInput || !Number.isFinite(Number(input.value)) || Number(input.value) < 0)){
+    return alert('Informe valores e sinais válidos, iguais ou maiores que zero.');
+  }
+  const paxInputs = [$('#c_px'), ...rows.map(row => row.querySelector('.schedule-pax'))];
+  if(paxInputs.some(input => !Number.isInteger(Number(input.value)) || Number(input.value) < 1)){
+    return alert('A quantidade de pessoas deve ser um número inteiro maior que zero.');
+  }
+  const installmentInputs = [
+    ...(!id && val('c_signal_method') === 'Cartão de crédito' && Number(val('c_signal')) > 0 ? [$('#c_signal_installments')] : []),
+    ...rows.filter(row => Number(row.querySelector('.schedule-signal')?.value) > 0 && row.querySelector('.schedule-signal-method')?.value === 'Cartão de crédito')
+      .map(row => row.querySelector('.schedule-signal-installments'))
+  ];
+  if(installmentInputs.some(input => !Number.isInteger(Number(input.value)) || Number(input.value) < 1)){
+    return alert('Informe um número inteiro de parcelas maior que zero.');
+  }
 
   const v = {
     client_name:titleCaseName(val('c_name')),
@@ -2190,7 +2339,7 @@ async function saveBooking(id,sendEmail=false){
     pax:v.pax,
     ticket_included:v.ticket_included,
     ticket_info:val('c_ticket_info').trim(),
-    service_total:Number(val('c_tt')) || 0
+    service_total:moneyCents(val('c_tt')) / 100
   }];
 
   const newSignals = [];
@@ -2201,7 +2350,7 @@ async function saveBooking(id,sendEmail=false){
       tour_time:row.querySelector('.schedule-time').value || null,
       itinerary:row.querySelector('.schedule-itinerary').value,
       pax:Number(row.querySelector('.schedule-pax').value) || 1,
-      service_total:Number(row.querySelector('.schedule-total').value) || 0,
+      service_total:moneyCents(row.querySelector('.schedule-total').value) / 100,
       ticket_included:row.querySelector('.schedule-ticket').checked,
       ticket_info:row.querySelector('.schedule-ticket-info').value.trim(),
       ticket_bought:row.querySelector('.schedule-ticket-bought').checked,
@@ -2216,7 +2365,7 @@ async function saveBooking(id,sendEmail=false){
     v.schedule_items.push(item);
 
     const signalInput = row.querySelector('.schedule-signal');
-    const amount = Number(signalInput?.value) || 0;
+    const amount = moneyCents(signalInput?.value) / 100;
     if(amount > 0){
       if(amount > item.service_total){
         return alert('O sinal de um dos roteiros adicionais é maior que o valor total desse roteiro.');
@@ -2229,13 +2378,14 @@ async function saveBooking(id,sendEmail=false){
           ? Math.max(1,Number(row.querySelector('.schedule-signal-installments').value) || 1)
           : 1,
         paid_at:row.querySelector('.schedule-signal-date').value || iso(new Date()),
+        service_id:item.service_id,
         label:`${item.itinerary} · ${dBR(item.tour_date)}`
       });
     }
   }
 
   // o total da reserva passa a ser a soma de todos os roteiros
-  v.total = v.schedule_items.reduce((sum,item) => sum + Number(item.service_total || 0),0);
+  v.total = v.schedule_items.reduce((sum,item) => sum + moneyCents(item.service_total),0) / 100;
 
   if(v.schedule_items.some(item => !item.tour_date || !item.itinerary || item.pax < 1)){
     return alert('Preencha data, roteiro e quantidade de pessoas em cada dia da reserva.');
@@ -2268,97 +2418,40 @@ async function saveBooking(id,sendEmail=false){
     return alert('Informe um e-mail válido para o cliente.');
   }
 
-  const signal = id ? 0 : Number(val('c_signal')) || 0;
+  const signal = id ? 0 : moneyCents(val('c_signal')) / 100;
   const mainServiceTotal = Number(val('c_tt')) || 0;
-  const extraSignalsSum = newSignals.reduce((s,x) => s + x.amount,0);
+  const extraSignalsSum = newSignals.reduce((s,x) => s + moneyCents(x.amount),0);
   if(!id && (signal < 0 || signal > mainServiceTotal)){
     return alert('O sinal do roteiro principal precisa ser igual ou menor que o valor total desse roteiro.');
   }
-  if(signal + extraSignalsSum > v.total){
+  if(moneyCents(signal) + extraSignalsSum > moneyCents(v.total)){
     return alert('A soma dos sinais não pode ser maior que o total da reserva.');
   }
 
-  let bookingId = id;
-  let r;
-  if(id){
-    const previous = bookings.find(item=>item.id===id);
-    const signature = items => bookingServices(items).map(item=>`${item.tour_date}|${String(item.tour_time||'').slice(0,5)}|${String(item.itinerary||'').trim().toLowerCase()}`).sort().join('||');
-    if(previous && signature(previous)!==signature(v)){
-      v.rescheduled_at = new Date().toISOString();
-      v.reschedule_count = Number(previous.reschedule_count || 0) + 1;
-    }
-    r = await db.from('bookings').update(v).eq('id',id);
-  }else{
-    r = await db.from('bookings').insert({...v,account_id:acc.id}).select('id').single();
-    if(!r.error) bookingId = r.data.id;
+  const signalsToSave=newSignals.map(s=>({
+    service_id:s.service_id, amount:s.amount, method:s.method,
+    installments:s.installments, paid_at:s.paid_at, notes:`Sinal do roteiro: ${s.label}`
+  }));
+  if(!id && signal>0){
+    const method=val('c_signal_method');
+    signalsToSave.unshift({
+      service_id:v.schedule_items[0].service_id, amount:signal, method,
+      installments:method==='Cartão de crédito' ? Number(val('c_signal_installments')) : 1,
+      paid_at:val('c_signal_date') || iso(new Date()), notes:'Sinal do roteiro principal'
+    });
   }
-
-  if(r.error){
-    return alert('Não foi possível salvar a reserva: ' + r.error.message);
-  }
-
-  if(!id){
-    const method = val('c_signal_method');
-    const installments = method === 'Cartão de crédito'
-      ? Math.max(1,Number(val('c_signal_installments')) || 1)
-      : 1;
-    const paidAt = val('c_signal_date') || iso(new Date());
-
-    if(signal > 0){
-      const paymentResult = await db.from('payments').insert({
-        booking_id:bookingId,
-        account_id:acc.id,
-        amount:signal,
-        method,
-        payment_type:'sinal',
-        installments,
-        paid_at:paidAt
-      });
-
-      if(paymentResult.error){
-        $('#dlg').close();
-        await load();
-        return alert('A reserva foi salva, mas não foi possível registrar o sinal: ' + paymentResult.error.message + '. Abra a reserva para lançar o pagamento.');
-      }
-    }
-  }
-
-  if(newSignals.length){
-    const extraPay = await db.from('payments').insert(newSignals.map(s => ({
-      booking_id:bookingId,
-      account_id:acc.id,
-      amount:s.amount,
-      method:s.method,
-      payment_type:'sinal',
-      installments:s.installments,
-      paid_at:s.paid_at,
-      notes:`Sinal do roteiro: ${s.label}`
-    })));
-
-    if(extraPay.error){
-      $('#dlg').close();
-      await load();
-      return alert('A reserva foi salva, mas não foi possível registrar o sinal dos roteiros adicionais: ' + extraPay.error.message + '. Lance o pagamento na aba Financeiro.');
-    }
-  }
-
-  $('#dlg').close();
-  await load();
-
-  if(googleAccessToken && googleTokenExpiresAt > Date.now()){
-    const savedBooking = bookings.find(item => item.id === bookingId);
-    if(savedBooking){
-      try{ await syncGoogleBooking(savedBooking); }
-      catch(error){ alert('Reserva salva, mas a sincronização com o Google Agenda falhou: ' + error.message); }
-    }
-  }else if(acc.google_calendar_client_id){
-    alert('Reserva salva. Para sincronizar com o Google Agenda, abra Equipe e conecte novamente.');
-  }
-
-  if(sendEmail){
-    await sendBookingVoucher(bookingId);
-  }
+  const version=id ? Number($('#dlg').dataset.writeVersion) : null;
+  if(id && (!Number.isInteger(version) || version<1)) return alert('Reabra a reserva para carregar sua versão atual antes de editar.');
+  const pending={sendEmail,args:{
+    p_account_id:acc.id, p_request_id:crypto.randomUUID(), p_booking_id:id || null,
+    p_expected_version:version, p_booking:v, p_signals:signalsToSave
+  }};
+  // Save retry context before sending; if the response is lost, replay the same identifier.
+  sessionStorage.setItem(pendingBookingKey(),JSON.stringify(pending));
+  const bookingId=await submitPendingBooking(pending);
+  await finishBookingSave(bookingId,sendEmail);
 }
+
 
 async function deleteBooking(id){
   if(!canManage()) return alert('Seu nível de acesso não permite excluir reservas.');
@@ -2381,82 +2474,30 @@ async function deleteBooking(id){
 // ===============================
 
 async function addPay(bid){
-
+  if(bookingSaveInProgress) return;
   if(!canAdd()) return alert('Seu nível de acesso não permite adicionar pagamentos.');
-
-  const amount =
-    Number(val('p_amt'));
-
-  const payment_type =
-    val('p_type');
-
-  const method =
-    val('p_met');
-
-  const installments =
-    Number(val('p_inst')) || 1;
-
-  const paid_at =
-    val('p_dt');
-
-  const notes =
-    val('p_note').trim();
-
-
-  if(!(amount > 0)){
-
-    return alert(
-      'Informe o valor do pagamento.'
-    );
-  }
-
-
-  if(
-    method !== 'Cartão de crédito' &&
-    installments !== 1
-  ){
-
-    return alert(
-      'Parcelas só podem ser usadas no cartão de crédito.'
-    );
-  }
-
-
-  const r =
-    await db
-      .from('payments')
-      .insert({
-
-        booking_id:bid,
-
-        account_id:acc.id,
-
-        amount,
-
-        method,
-
-        payment_type,
-
-        installments,
-
-        notes:
-          notes || null,
-
-        paid_at
-      });
-
-
-  if(r.error){
-
-    return alert(r.error.message);
-  }
-
-
-  await load();
-
-  openBooking(bid);
+  bookingSaveInProgress=true;
+  try{
+    let pending=readPendingBookingSave();
+    if(!pending){
+      const cents=moneyCents(val('p_amt'));
+      const installments=Number(val('p_inst'));
+      const method=val('p_met');
+      if(cents<=0) return alert('Informe o valor do pagamento.');
+      if(!Number.isInteger(installments) || installments<1) return alert('Informe parcelas inteiras maiores que zero.');
+      if(method!=='Cartão de crédito' && installments!==1) return alert('Parcelas só podem ser usadas no cartão de crédito.');
+      if(!val('p_dt')) return alert('Informe a data do pagamento.');
+      pending={kind:'payment',sendEmail:false,args:{
+        p_account_id:acc.id,p_request_id:crypto.randomUUID(),p_booking_id:bid,
+        p_payment:{amount:cents/100,method,payment_type:val('p_type'),installments,paid_at:val('p_dt'),notes:val('p_note').trim() || null}
+      }};
+      sessionStorage.setItem(pendingBookingKey(),JSON.stringify(pending));
+    }
+    const bookingId=await submitPendingBooking(pending);
+    await finishBookingSave(bookingId,pending.sendEmail,pending.kind);
+  }catch(error){alert('Pagamento não concluído ou ainda não confirmado: '+error.message);}
+  finally{bookingSaveInProgress=false;}
 }
-
 
 async function voidPay(pid,bid){
 
@@ -3210,7 +3251,7 @@ function googleEventPayload(booking,item){
   const event = {
     summary:`${code} · ${booking.client_name} · ${item.itinerary}`,
     description:`Localizador: ${code}\nCliente: ${booking.client_name}\nRoteiro: ${item.itinerary}\nPessoas: ${item.pax}\nValor total da reserva: ${brl(booking.total)}`,
-    location:booking.pickup_location || '',
+    location:item.pickup || booking.pickup_location || '',
     extendedProperties:{private:{booking_id:booking.id,service_id:item.service_id || 'principal',booking_code:code}}
   };
   if(item.tour_time){
@@ -3219,8 +3260,8 @@ function googleEventPayload(booking,item){
     event.start={dateTime:start.toISOString(),timeZone:'America/Sao_Paulo'};
     event.end={dateTime:end.toISOString(),timeZone:'America/Sao_Paulo'};
   }else{
-    const next = new Date(`${item.tour_date}T12:00:00-03:00`);
-    next.setDate(next.getDate()+1);
+    const next = new Date(`${item.tour_date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate()+1);
     event.start={date:item.tour_date};
     event.end={date:next.toISOString().slice(0,10)};
   }
@@ -3262,9 +3303,10 @@ async function syncGoogleBooking(booking){
       delete ids[key];
     }
   }
-  const {error}=await db.from('bookings').update({google_event_ids:ids}).eq('id',booking.id);
+  const {data,error}=await db.from('bookings').update({google_event_ids:ids}).eq('id',booking.id).eq('account_id',acc.id).select('*,payments(*)').single();
   if(error) throw new Error('Evento criado, mas não foi possível salvar o vínculo no app: ' + error.message);
   booking.google_event_ids=ids;
+  Object.assign(booking,data);
 }
 
 async function connectGoogleCalendar(){
