@@ -2103,6 +2103,7 @@ async function saveBooking(id,sendEmail=false){
     client_email:val('c_email').trim(),
     client_document:val('c_doc').trim(),
     client_state:val('c_state') || null,
+    client_country:val('c_country').trim() || null,
     client_birthday:val('c_birthday') || null,
     tour_date:val('c_dt'),
     tour_time:val('c_hr') || null,
