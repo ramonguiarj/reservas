@@ -1240,7 +1240,10 @@ async function openBooking(id){
   const extraServices = id && Array.isArray(b.schedule_items)
     ? b.schedule_items.slice(1)
     : [];
-
+  const extrasTotal = extraServices.reduce((s,x)=>s+Number(x.service_total||0),0);
+  const mainTotal = id
+    ? (savedServices[0]?.service_total ?? Math.max(0,Number(b.total||0)-extrasTotal))
+    : b.total;
 
   const locked =
     id &&
