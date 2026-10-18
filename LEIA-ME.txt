@@ -1,0 +1,26 @@
+VOUCHER EM PORTUGUÊS, INGLÊS E ESPANHOL — VERSÃO 4
+
+Abra app-voucher-idiomas-v4.html no lugar da versão 3. O arquivo contém o app completo e os modelos incorporados, para continuar funcionando quando aberto diretamente no computador. A pasta voucher-idiomas guarda cópias dos modelos e o código usado no servidor. Não há API de tradução paga nem tradução automática de textos novos.
+
+COMO USAR
+1. Abra a reserva. No Carrinho, escolha “Idioma do voucher”: automático pelo WhatsApp, português, inglês ou espanhol. Para telefones estrangeiros, informe + e o código do país. Confira o idioma com o cliente; o país do número é apenas uma sugestão. Países fora do português/espanhol usam inglês na opção automática.
+2. No roteiro principal e em cada dia adicional, abra “Traduções do voucher — inglês e espanhol”. Preencha o nome/descrição do roteiro e os detalhes do ingresso no idioma desejado. Em dias adicionais, há também endereço/instruções de busca.
+3. Em “Informações do voucher”, abra o mesmo bloco de traduções e preencha as instruções para o cliente e o endereço/instruções de busca. Endereços e nomes próprios podem ser copiados como estão. Campos sem texto original podem ficar vazios.
+4. A política de cancelamento atual e o roteiro cadastrado Cristo Redentor já têm traduções preparadas. Você pode revisar e editar as versões nos campos. Se o original mudar, revise as traduções. Não alteramos percentuais, prazos nem regras da política.
+5. Clique em “Salvar alterações”. O voucher usa os dados salvos. Use “Voucher” para conferir e, depois, envie por e-mail como de costume.
+6. Caso falte uma tradução no idioma escolhido, o app avisa e não envia o voucher incompleto. Você pode salvar a reserva antes de terminar as traduções. Se alterar um original e mantiver a mesma tradução, revise-a e marque a confirmação no bloco correspondente.
+
+As traduções preenchidas ficam salvas na própria reserva e são reutilizadas ao reabri-la. Não são um cadastro global de roteiros. Os botões de voucher, voucher sem valores e o resumo do WhatsApp usam a mesma escolha de idioma. O botão de WhatsApp continua preparando uma mensagem; não anexa PDF automaticamente.
+
+ARQUIVOS
+- pt.json, en.json, es.json: textos padrão traduzidos.
+- politicas.json: política em português e traduções em inglês/espanhol vinculadas ao original atual.
+- roteiros.json: tradução do roteiro cadastrado Cristo Redentor.
+- voucher-i18n.js: modelos e geração compartilhada do voucher.
+- send-booking-voucher.ts: código da função de e-mail, já atualizado no Supabase (versão 6).
+- exemplo-en.html, exemplo-es.html: exemplos com dados fictícios.
+
+Alterar apenas os JSON desta pasta não atualiza as cópias já incorporadas no HTML ou no servidor. Para suas reservas, use os campos do app. Para editar os textos padrão, atualize conjuntamente os modelos incorporados no app e a função de e-mail.
+
+VALIDAÇÃO
+Testados localmente: seleção e ajuste do idioma; gravação das traduções no pedido de salvamento; recuperação dos campos; textos ausentes/desatualizados; revisão de alterações; escaping de HTML; total, participantes e pagamentos preservados; e-mail em inglês/espanhol com provedor simulado; compatibilidade do envio anterior em português. A função publicada foi recuperada e comparada com a versão testada. Nenhum e-mail real foi enviado e nenhuma reserva foi alterada nos testes. A validação visual no navegador não foi concluída: a ferramenta bloqueou a abertura de arquivo local.
