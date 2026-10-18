@@ -1585,14 +1585,14 @@ async function openBooking(id){
           Pessoas
         </label>
 
-        <input
-          id="c_px"
-          type="number"
-          min="1"
-          value="${b.pax}"
-          ${dis}
-          onchange="applyPaxPrice()"
-        >
+       <input
+  id="c_px"
+  type="number"
+  min="1"
+  step="1"
+  value="${b.pax}"
+  onchange="updateGrandTotal()"
+>
 
       </div>
 
