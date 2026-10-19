@@ -467,6 +467,29 @@ header{flex-wrap:wrap;gap:8px}header b{flex:1;min-width:130px}.tabs{flex-wrap:wr
 @media(max-width:650px){header{position:relative;padding:12px!important}header img{max-width:40px}.tabs{display:flex;overflow-x:auto;flex-wrap:nowrap}.tabs button{flex:none;min-width:auto;white-space:nowrap}.v8-grid{grid-template-columns:1fr}#dlg{width:100%;max-width:100%;max-height:94dvh;margin:auto 0 0;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px}.booking-actionbar{position:sticky;bottom:0;top:auto;z-index:12;background:white;padding:10px 0;box-shadow:0 -5px 15px #0001}.client-list,.client-list tbody,.client-list tr,.client-list td{display:block;width:auto!important;min-width:0!important}.client-list thead{display:none}.client-list tr{border:1px solid var(--line);margin:12px 0;padding:12px;border-radius:12px}.client-list td{border:none!important;padding:5px!important;overflow-wrap:anywhere}.client-list td:first-child{font-size:16px;font-weight:bold}.v8-month{grid-template-columns:75px 1fr 70px}.fin-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .payment-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;line-height:1.5;padding:5px 10px;border:1px solid transparent;border-radius:999px;white-space:normal}.payment-status-paid{background:#dcfce7;color:#14532d;border-color:#86c99c}.payment-status-deposit{background:#fff1bc;color:#654500;border-color:#d5b64e}.payment-status-overdue{background:#fee2e2;color:#8b1c1c;border-color:#e59999}.payment-status-awaiting,.payment-status-undefined,.payment-status-inactive{background:#eef1f4;color:#3d4855;border-color:#bcc5cf}.card.payment-paid,.v8-item.payment-paid,.payment-details.payment-paid{border-left:5px solid #258047;background:#f2fcf4}.card.payment-deposit,.v8-item.payment-deposit,.payment-details.payment-deposit{border-left:5px solid #c99411;background:#fffbed}.card.payment-overdue,.v8-item.payment-overdue,.payment-details.payment-overdue{border-left:5px solid #c43c3c;background:#fff4f4}.payment-legend{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.payment-card-heading{margin:0 0 9px}.payment-details{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}.payment-amounts{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}.payment-amounts span{display:grid;gap:4px;font-size:13px}.payment-amounts b{font-size:17px}.summary-card small{display:block;font-size:12px;line-height:1.5;margin-top:6px;color:var(--mut)}.summary-card button{font-size:12px;padding:6px 10px;margin-top:8px}.summary-card.payment-summary-open{background:#fffbed;border-color:#d9c779}.summary-card.payment-summary-overdue{background:#fff1f1;border-color:#e5a6a6}.payment-summary-overdue strong{color:#9e2424}.top{flex-wrap:wrap;gap:7px}.summary{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}@media(max-width:650px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.payment-amounts{gap:10px}.payment-status{font-size:11px}}
 
+
+/* Nova reserva: escolha do roteiro antes dos detalhes. */
+#dlg.new-reservation{max-width:780px;background:#f7f8f3;padding:24px;color:var(--ink)}
+.new-reservation [hidden]{display:none!important}
+.nr-intro{color:var(--mut);margin:8px 0 22px;font-size:14px}
+.nr-section{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin:14px 0}
+.nr-section h3{margin:0 0 14px;font-size:18px;letter-spacing:-.3px}
+.nr-kicker{display:block;color:var(--mut);font-size:11px;letter-spacing:1.3px;text-transform:uppercase;margin-bottom:5px}
+.nr-routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.nr-route{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:7px;background:#fafbf8;color:var(--g);border:1px solid var(--line);padding:16px;border-radius:12px;min-height:96px}
+.nr-route span{font-size:13px;color:var(--mut)}
+.nr-route[aria-pressed="true"]{border:2px solid var(--g);background:#edf5e6;padding:15px;box-shadow:0 0 0 2px #9cff1e33}
+.nr-route:hover{border-color:var(--g)}
+.nr-section input,.nr-section select,.nr-section textarea{min-height:46px;border-radius:10px}
+.nr-section label{margin-top:14px;color:var(--ink)}
+.nr-section details{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+.nr-section summary{cursor:pointer;color:var(--g);font-size:14px;font-weight:600}
+.nr-footer{position:sticky;bottom:-24px;background:#f7f8f3f5;border-top:1px solid var(--line);padding:14px 0 8px;z-index:2}
+.nr-footer .acts{margin:0;display:flex}.nr-footer button{flex:1;min-height:48px}
+.nr-hint{padding:18px;text-align:center;color:var(--mut);font-size:14px}
+.new-reservation #pro_booking_status{font-size:12px;margin:12px 0}
+@media(max-width:540px){#dlg.new-reservation{padding:16px;width:calc(100% - 12px)}.nr-routes{grid-template-columns:1fr}.nr-section{padding:16px}.new-reservation .row{flex-direction:column;gap:0}.nr-footer{bottom:-16px}.nr-footer .acts{flex-direction:column}}
+
 </style>
 </head>
 
@@ -2552,13 +2575,68 @@ async function openBooking(id){
     if(addExtra) addExtra.disabled=true;
   }
   $('#dlg').dataset.writeVersion = id ? String(b.write_version ?? '') : '';
+  $('#dlg').classList.remove('new-reservation');
   if(id) configureBookingTabs(id,b);
   mountCustomerBookingTools(b,!!id,locked);
   updateVoucherLanguageHint();
+  if(!id) configureNewReservation();
 
   updateGrandTotal();
   $('#dlg').showModal();
   proArmBookingEditor(id);
+}
+
+
+function configureNewReservation(){
+  const dlg=$('#dlg');dlg.classList.add('new-reservation');
+  // Move existing fields so saving, permissions and integrations retain their handlers.
+  const sections={};let current=null;
+  const footer=document.createElement('div');footer.className='nr-footer';
+  for(const node of [...dlg.children]){
+    if(node.tagName==='H3'){
+      current=document.createElement('section');current.className='nr-section';
+      sections[node.textContent.trim()]=current;dlg.insertBefore(current,node);current.append(node);
+    }else if(current){
+      if(node.classList.contains('acts')&&node.querySelector('[onclick^="saveBooking"]'))footer.append(node);
+      else current.append(node);
+    }
+  }
+  const make=(number,title)=>{const el=document.createElement('section');el.className='nr-section';el.innerHTML=`<span class="nr-kicker">${number}</span><h3>${title}</h3>`;return el;};
+  const client=make('01 · Cliente','Quem está reservando?');
+  const logistics=make('02 · Passeio','Quando e qual tour?');
+  const finance=make('03 · Financeiro','Valores e pagamento');
+  const details=document.createElement('div');details.id='nr-details';details.hidden=false;
+  const move=(id,target)=>{
+    const field=$('#'+id);if(!field)return;
+    const label=dlg.querySelector(`label[for="${id}"]`);
+    const wrap=document.createElement('div');
+    if(label)wrap.append(label);wrap.append(field);target.append(wrap);
+  };
+  const intro=document.createElement('p');intro.className='nr-intro';intro.textContent='Preencha os dados do cliente, organize o passeio e confira os valores.';
+  ['c_name','c_tel','c_email','c_birthday'].forEach(id=>move(id,client));
+  const phoneLabel=client.querySelector('label[for="c_tel"]');if(phoneLabel)phoneLabel.textContent='Telefone / WhatsApp';
+  const birthdayLabel=client.querySelector('label[for="c_birthday"]');if(birthdayLabel)birthdayLabel.textContent='Data de nascimento';
+  ['c_dt','c_hr','c_it'].forEach(id=>move(id,logistics));
+  logistics.append($('#c_custom_itinerary_field'));
+  ['c_px','c_pickup'].forEach(id=>move(id,logistics));
+  const pickupLabel=logistics.querySelector('label[for="c_pickup"]');if(pickupLabel)pickupLabel.textContent='Hospedagem ou ponto de encontro';
+  const tools=$('#booking-customer-tools');if(tools){const reuse=document.createElement('details');reuse.innerHTML='<summary>Buscar cliente já cadastrado</summary>';reuse.append(tools);client.append(reuse);}
+  ['c_tt'].forEach(id=>move(id,finance));
+  const recalc=dlg.querySelector('.service-card-main [data-service-price]');if(recalc)finance.append(recalc);
+  const note=document.createElement('p');note.className='m';note.textContent='Informe o valor combinado ou use “Recalcular pelo cadastro”. Alterar pessoas ou roteiro preserva esse valor.';finance.append(note);
+  const signal=sections['Valores e sinal pago'];if(signal){signal.querySelector('h3')?.remove();finance.append(...signal.childNodes);signal.remove();}
+  const total=$('#booking-grand-total');if(total)finance.append(total);
+  const collapse=(section,title,target)=>{if(!section)return;const box=document.createElement('details');const summary=document.createElement('summary');summary.textContent=title;box.append(summary);section.querySelector('h3')?.remove();box.append(...section.childNodes);section.remove();target.append(box);};
+  // These follow-up fields remain available, but do not compete with creating a booking.
+  const post=document.createElement('div');
+  ['c_photo_status','c_photo_delivered'].forEach(id=>move(id,post));
+  collapse(sections['Dados do cliente'],'Mais dados do cliente e origem da venda',client);
+  collapse(sections['Serviço principal'],'Guia, duração e ingressos',logistics);
+  collapse(sections['Outros dias ou roteiros desta reserva'],'Adicionar outros dias ou roteiros',logistics);
+  collapse(sections['Informações do voucher'],'Voucher, itens inclusos e observações',client);
+  const follow=document.createElement('details');follow.innerHTML='<summary>Acompanhamento das fotos após o passeio</summary>';follow.append(post);client.append(follow);
+  details.append(client,logistics,finance,footer);
+  dlg.append(intro,details);
 }
 
 function setBookingTab(key,button){
@@ -3950,7 +4028,7 @@ function proRefreshBookingStatus(){
   if(!dirty && booking){
     try{const d=buildVoucherData(booking,acc,itineraryVoucherCatalog);note=` • Voucher: ${{pt:'português',en:'inglês',es:'espanhol'}[d.language]}${d.fallbacks?.length?` com ${d.fallbacks.length} trecho(s) em português`:''}`;}catch{}
   }
-  banner.textContent=(dirty?'Alterações não salvas. Salve para atualizar o voucher.':'Dados salvos'+note);
+  banner.textContent=(dirty?'Alterações não salvas. Salve para atualizar o voucher.':booking?'Dados salvos'+note:'Nova reserva · ainda não salva');
   banner.dataset.dirty=String(dirty);
   $('#dlg').querySelectorAll('button[onclick^="voucher("]').forEach(button=>{
     if(!button.dataset.cleanLabel)button.dataset.cleanLabel=button.textContent;
