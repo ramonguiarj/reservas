@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Fluida",
+  "short_name": "Fluida",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#e2ddc7",
+  "theme_color": "#07383a",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
