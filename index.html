@@ -3654,6 +3654,20 @@ function voucherEmailRemember(id,rows){
   if(pending?.request_id&&sorted.some(row=>row.request_id===pending.request_id&&["accepted","failed"].includes(row.status)))clearVoucherEmailPending(id);
   voucherEmailSummaries.set(id,{latest:sorted[0]||null,lastAccepted:sorted.find(row=>row.status==='accepted')||prior?.lastAccepted||null,error:false});
 }
+function voucherEmailImportedRows(id=null){
+  const available=[...allAccountBookings,...bookings],seen=new Set(),rows=[];
+  for(const b of available){if(seen.has(b.id)||(id&&b.id!==id))continue;seen.add(b.id);
+    for(const item of b.voucher_options?.verified_voucher_email_history||[]){
+      if(item?.provider_id&&item.status==='accepted')rows.push({...item,booking_id:b.id,account_id:b.account_id,requested_by:null});
+    }
+  }
+  return rows;
+}
+function voucherEmailMergeImported(rows,id=null){
+  const known=new Set(rows.map(r=>r.provider_id||r.request_id));
+  return [...rows,...voucherEmailImportedRows(id).filter(r=>!known.has(r.provider_id||r.request_id))];
+}
+
 async function voucherEmailReadRows(id=null){
   const accountId=acc.id,rows=[];let cursor=null;
   for(;;){
@@ -3663,7 +3677,7 @@ async function voucherEmailReadRows(id=null){
     const result=await query;
     if(result.error)throw new Error('O histórico de vouchers está indisponível. Atualize para consultar o resultado.');
     const page=result.data||[];
-    if(!page.length)return rows;
+    if(!page.length)return voucherEmailMergeImported(rows,id);
     const next=page.at(-1)?.request_id;
     if(!next||(cursor&&next<=cursor))throw new Error('Não foi possível atualizar o histórico de vouchers.');
     rows.push(...page);cursor=next;
@@ -3702,7 +3716,7 @@ function voucherEmailSummaryContent(id,detail=false){
   if(voucherEmailBusy.has(id))return '<strong class="voucher-email-badge processing">Enviando voucher…</strong>';
   if(pending?.request_id&&(!item||item.request_id!==pending.request_id)){item={request_id:pending.request_id,status:'uncertain',created_at:pending.created_at};}
   if(!item&&(entry?.error||voucherEmailSummaryError))return '<span class="voucher-email-badge uncertain">Status de e-mail indisponível</span>';
-  if(!item)return `<span class="m">${voucherEmailSummaryReady?'Nenhum envio de voucher registrado':'Consultando envio do voucher…'}</span>`;
+  if(!item)return `<span class="m">${voucherEmailSummaryReady?'Sem registro de envio — vouchers antigos podem ter sido enviados sem histórico.':'Consultando envio do voucher…'}</span>`;
   const error=voucherEmailErrorReason(item.error_code),previous=entry?.lastAccepted;
   return `<strong class="voucher-email-badge ${esc(item.status)}">${esc(voucherEmailStatusLabel(item.status))}</strong><span class="m"> ${esc(voucherEmailDate(voucherEmailWhen(item)))}</span>${detail&&item.recipient?`<div class="m">Para ${esc(item.recipient)}</div>`:''}${detail&&error?`<div class="voucher-email-error">${esc(error)} <span class="m">(${esc(item.error_code)})</span></div>`:''}${detail&&item.status==='accepted'?'<div class="m">Envio confirmado pelo serviço de e-mail; a entrega na caixa do cliente ainda não foi confirmada.</div>':''}${previous&&item.status!=='accepted'?`<div class="m">Último envio confirmado: ${esc(voucherEmailDate(voucherEmailWhen(previous)))}</div>`:''}${entry?.error||voucherEmailSummaryError?'<div class="m">Não foi possível atualizar o histórico. Este é o último registro consultado.</div>':''}`;
 }
@@ -3712,7 +3726,7 @@ function voucherEmailInlineContent(id){
   const entry=voucherEmailSummaries.get(id),pending=readVoucherEmailPending(id);
   const booking=bookings.find(b=>b.id===id);
   const email=String(booking?.client_email||'').trim().toLowerCase();
-  let item=entry?.latest,label='E-mail não enviado',state='failed',note='Nenhum envio registrado para esta reserva.';
+  let item=entry?.latest,label='Sem registro de envio',state='uncertain',note='A ausência de registro não confirma que o voucher nunca foi enviado.';
   if(voucherEmailBusy.has(id)){label='Enviando e-mail…';state='processing';note='Aguarde a confirmação do serviço de e-mail.';}
   else if(pending?.request_id&&(!item||item.request_id!==pending.request_id)){label='Envio sem confirmação';state='uncertain';note='Consulte o histórico antes de tentar novamente.';}
   else if(entry?.error||voucherEmailSummaryError){label='Status indisponível';state='uncertain';note='Não foi possível atualizar o histórico de envio.';}
@@ -3720,7 +3734,7 @@ function voucherEmailInlineContent(id){
     const sameRecipient=email&&String(item.recipient||'').trim().toLowerCase()===email;
     if(!sameRecipient){note='O último registro é de outro endereço. Nenhum envio confirmado para o e-mail atual.';}
     else if(['accepted','delivered'].includes(item.status)){label='E-mail enviado';state='accepted';note='Envio confirmado em '+voucherEmailDate(voucherEmailWhen(item))+'. A entrega na caixa do cliente pode ainda não estar confirmada.';}
-    else if(item.status==='failed'){note=voucherEmailErrorReason(item.error_code)||'O serviço informou falha no envio.';}
+    else if(item.status==='failed'){label='E-mail não enviado';state='failed';note=voucherEmailErrorReason(item.error_code)||'O serviço informou falha no envio.';}
     else{label=item.status==='processing'?'Enviando e-mail…':'Envio sem confirmação';state=item.status==='processing'?'processing':'uncertain';note='O serviço ainda não confirmou o envio.';}
   }
   else if(!voucherEmailSummaryReady){label='Consultando envio…';state='processing';note='Consultando o histórico desta reserva.';}
@@ -3745,7 +3759,7 @@ async function loadVoucherSendHistory(id){
     const history=await voucherEmailHistory(id);
     if(scope!==voucherEmailCurrentScope())return;
     const markup=history.length?history.map(item=>{
-      const who=team[item.requested_by]?.name||team[item.requested_by]?.email||'Usuário autorizado';
+      const who=item.source==='resend_history_import'?'Histórico recuperado do Resend (remetente não identificado)':item.source==='legacy_provider_ack'?'Envio confirmado pelo serviço':team[item.requested_by]?.name||team[item.requested_by]?.email||'Usuário autorizado';
       const retry=canAdd()&&item.requested_by===me.user_id&&['processing','uncertain'].includes(item.status),reason=voucherEmailErrorReason(item.error_code);
       return `<div class="booking-info"><strong>${esc(voucherEmailStatusLabel(item.status))}</strong>${esc(voucherEmailDate(voucherEmailWhen(item)))} · ${esc(item.recipient)} · ${esc(({pt:'Português',en:'Inglês',es:'Espanhol'})[item.language]||item.language)}<br><span class="m">Solicitado em ${esc(voucherEmailDate(item.created_at))} por ${esc(who)}${item.status==='accepted'?' · A entrega ao destinatário ainda não foi confirmada.':''}</span>${reason?`<div class="voucher-email-error">${esc(reason)} <span class="m">(${esc(item.error_code)})</span></div>`:''}${retry?`<br><button type="button" class="alt" onclick="resumeVoucherEmail('${id}','${item.request_id}')">Consultar ou retomar esta tentativa</button>`:''}</div>`;
     }).join(''):'<p class="m">Nenhum envio registrado nesta versão.</p>';
@@ -3795,6 +3809,23 @@ async function sendBookingVoucher_impl1(id){
     const result=await db.functions.invoke('send-booking-voucher',{body:{booking_id:id,voucher_i18n:1,request_id:pending.request_id}});
     let data=result.data;
     if(result.error){try{if(result.error.context?.json)data=await result.error.context.json();}catch{}}
+    if(!result.error&&data?.ok&&data.id&&!data.status){
+      const item={request_id:pending.request_id,provider_id:data.id,recipient:booking.client_email,status:'accepted',created_at:new Date().toISOString(),accepted_at:new Date().toISOString(),language:['pt','en','es'].includes(booking.voucher_options?.language)?booking.voucher_options.language:'pt',source:'legacy_provider_ack'};
+      voucherEmailRemember(id,[item,...voucherEmailImportedRows(id)]);
+      clearVoucherEmailPending(id);
+      try{
+        const current=await db.from('bookings').select('voucher_options').eq('id',id).eq('account_id',acc.id).single();
+        if(current.error)throw current.error;
+        const options={...(current.data?.voucher_options||{})};
+        options.verified_voucher_email_history=[...(options.verified_voucher_email_history||[]).filter(r=>r.provider_id!==item.provider_id),item];
+        const saved=await db.from('bookings').update({voucher_options:options}).eq('id',id).eq('account_id',acc.id).select('id');
+        if(saved.error||!saved.data?.length)throw saved.error||new Error('Histórico não salvo.');
+        for(const b of [...bookings,...allAccountBookings])if(b.id===id)b.voucher_options=options;
+        await loadVoucherSendHistory(id);
+        notifyUser('E-mail enviado. O serviço confirmou o envio; a entrega na caixa do cliente ainda não foi confirmada.');
+      }catch(error){notifyUser('E-mail enviado, mas não foi possível salvar o histórico. Não reenvie apenas para atualizar o indicador.');}
+      return true;
+    }
     if(!result.error&&data?.ok&&data.status==='accepted'){
       clearVoucherEmailPending(id);
       notifyUser(`Voucher enviado por e-mail para ${data.recipient||booking.client_email}. A entrega ao destinatário ainda não foi confirmada.`);
