@@ -3071,7 +3071,7 @@ function configureBookingTabs(id,booking){
   // Keep original inputs and their values together on the first editing tab.
   const essentials=document.createElement('section');essentials.className='panel-box';
   essentials.innerHTML='<h3>Editar dados da reserva</h3><p class="m">Os dados salvos já estão preenchidos. Altere somente o que precisar e clique em Salvar.</p>';
-  for(const fieldId of ['c_name','c_tel','c_email','c_doc','c_country','c_state','c_birthday','c_dt','c_hr','c_it','c_px','c_signal_method']){
+  for(const fieldId of ['c_name','c_tel','c_email','c_doc','c_country','c_state','c_birthday','c_dt','c_hr','c_it','c_px','c_tt','c_signal_method']){
     const input=Object.values(panels).map(panel=>panel.querySelector('#'+fieldId)).find(Boolean);
     if(!input)continue;
     const label=Object.values(panels).map(panel=>panel.querySelector(`label[for="${fieldId}"]`)).find(Boolean);
@@ -3080,6 +3080,16 @@ function configureBookingTabs(id,booking){
   }
   if(!essentials.querySelector('#c_signal_method')){const wrap=document.createElement('div');wrap.innerHTML='<label for="c_signal_method">Forma de pagamento · opcional</label><select id="c_signal_method"><option value="Pix">Pix</option><option value="Cartão de crédito">Cartão de crédito</option><option value="Transferência">Transferência</option><option value="Dinheiro">Dinheiro em espécie</option></select>';essentials.append(wrap);}
   const paymentMethod=essentials.querySelector('#c_signal_method');if(paymentMethod){const option=document.createElement('option');option.value='';option.textContent='A definir';paymentMethod.prepend(option);const savedMethod=booking.voucher_options?.payment_method||'';if(savedMethod&&![...paymentMethod.options].some(o=>o.value===savedMethod)){const savedOption=document.createElement('option');savedOption.value=savedMethod;savedOption.textContent=savedMethod;paymentMethod.append(savedOption);}paymentMethod.value=savedMethod;paymentMethod.disabled=!!paymentMethod.closest('[disabled]')||!canManage()||(me.role!=='owner'&&booking.status!=='aberta');const label=essentials.querySelector('label[for="c_signal_method"]');if(label)label.textContent='Forma de pagamento · opcional';}
+  const price=essentials.querySelector('#c_tt');
+  if(price){
+    const label=essentials.querySelector('label[for="c_tt"]');
+    if(label)label.textContent=bookingServices(booking).length>1?'Valor do passeio principal (R$)':'Valor total da reserva (R$)';
+    const hint=document.createElement('p');hint.className='m';hint.id='booking-price-help';
+    hint.textContent=bookingServices(booking).length>1?'O total da reserva soma todos os passeios. Altere aqui o valor do passeio principal; os demais valores ficam em Passeios da reserva. Depois clique em Salvar alterações.':'Altere o valor combinado e clique em Salvar alterações. Os pagamentos já registrados serão preservados.';
+    price.setAttribute('aria-describedby',hint.id);price.after(hint);
+  }
+  const totalBox=panels.carrinho.querySelector('#booking-grand-total');
+  if(totalBox)essentials.append(totalBox);
   panels.dados.prepend(essentials);
   const history=document.createElement('section');
   history.className='booking-tab-panel';history.dataset.tab='historico';history.id='booking-panel-historico';history.setAttribute('role','tabpanel');history.setAttribute('aria-labelledby','booking-tab-historico');
