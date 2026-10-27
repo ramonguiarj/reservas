@@ -7,10 +7,10 @@
  const date=value=>{const v=String(value||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(v)?v.split('-').reverse().join('/'):'Sem data';};
  const button=(label,fn,cls='fg-button')=>{const b=el('button',label,cls);b.type='button';b.onclick=()=>{b.disabled=true;try{Promise.resolve(fn()).catch(showError).finally(()=>b.disabled=false);}catch(e){showError(e);b.disabled=false;}};return b;};
  function showError(error){if(!panel?.open)return;let n=panel.querySelector('[role="alert"]');if(!n){n=el('p',undefined,'fg-error');n.setAttribute('role','alert');panel.prepend(n);}n.textContent=error.message||'Não foi possível concluir. Tente novamente.';}
- async function api(action,body={}){
-  if(!identity()||identity()!==stamp)throw Error('Sua sessão mudou. Reabra o painel de ingressos.');
+ async function api(action,body={},expected=stamp){
+  if(!identity()||identity()!==expected)throw Error('Sua sessão mudou. Reabra o painel de ingressos.');
   const {data,error}=await db.functions.invoke('fluida-gmail-cloud',{body:{account_id:acc.id,action,...body}});
-  if(identity()!==stamp)throw Error('Sua sessão mudou. Reabra o painel de ingressos.');
+  if(identity()!==expected)throw Error('Sua sessão mudou. Reabra o painel de ingressos.');
   if(error)throw Error('Não foi possível consultar os ingressos. Confira sua conexão e tente novamente.');
   if(data?.error)throw Error(data.error);return data;
  }
@@ -79,11 +79,54 @@
   if(!panel){panel=el('dialog',undefined,'fg-panel');panel.setAttribute('aria-label','Ingressos do Gmail');document.body.append(panel);}
   panel.replaceChildren(button('Fechar',async()=>panel.close(),'fg-button fg-secondary'),el('p','Consultando ingressos…'));if(!panel.open)panel.showModal();try{await refresh();}finally{busy=false;}
  }
+ async function loadBookingLink(c,slot,owner){
+  try{
+   const data=await api('cloud-status',{},owner);
+   if(!slot.isConnected||!identity()||identity()!==owner)return;
+   const booking=data.bookings.find(b=>b.id===c.id);slot.replaceChildren(el('h3','Localizador Paineiras · associação automática'));
+   if(!booking){slot.append(el('p','Salve a reserva antes de configurar a associação do ingresso.'));return;}
+   slot.append(el('p','Informe o localizador da Paineiras no passeio correspondente. A próxima busca confere o PDF e a data da visita.'));
+   const current=c.panel.querySelector('[data-ticket-locator]');
+   for(const [index,service] of (booking.schedule_items||[]).entries()){
+    const row=el('div');row.style.cssText='padding:14px 0;border-bottom:1px solid #ddd';
+    row.append(el('strong',(service.itinerary||'Passeio')+' · '+date(service.tour_date)));
+    const label=el('label','Localizador da Paineiras'),input=el('input');input.placeholder='Ex.: LB32189707';input.maxLength=80;input.minLength=3;input.setAttribute('data-cloud-paineiras-locator',service.service_id);
+    const parts=String(service.locator||'').split(':');input.value=parts[0]==='PAINEIRAS'?parts.slice(1).join(':'):index===0?String(current?.value||''):'';
+    label.style.display='block';label.append(input);row.append(label);
+    const result=el('p');result.setAttribute('role','status');
+    if(!service.ticket_included)row.append(el('p','Marque ingresso incluso neste passeio e salve a reserva para habilitar a associação.'));
+    const save=button('Salvar localizador da Paineiras',async()=>{
+     try{
+      if(!service.ticket_included)throw Error('Salve o passeio com ingresso incluso antes de associar.');
+      if(!slot.isConnected||identity()!==owner||typeof ticketIsCurrent!=='function'||!ticketIsCurrent(c))throw Error('Reabra a reserva antes de salvar o localizador.');
+      if(!/^[\p{L}\p{N} ._\/-]{3,80}$/u.test(input.value.trim()))throw Error('Informe um localizador válido, com pelo menos 3 caracteres.');
+      await api('service',{booking_id:c.id,service_id:service.service_id,provider:'paineiras',locator:input.value.trim()},owner);
+      result.textContent='Localizador salvo para este passeio. O ingresso será associado quando o PDF e a data coincidirem.';
+      if(index===0&&current)current.value=input.value.trim();
+     }catch(e){result.textContent=e.message;}
+    });save.className='';save.setAttribute('data-cloud-save','');save.disabled=!service.ticket_included;
+    // Keep a disabled save disabled after interactions with the legacy form.
+    if(!service.ticket_included)save.setAttribute('data-cloud-included','false');
+    row.append(save,result);slot.append(row);
+   }
+   // Keep the older internal reference available without competing with the cloud field.
+   const legacyLabel=current?.closest('label');
+   if(legacyLabel&&!legacyLabel.closest('[data-cloud-legacy-reference]')){const details=el('details');details.setAttribute('data-cloud-legacy-reference','');details.append(el('summary','Referência interna anterior (opcional)'),legacyLabel);c.panel.querySelector('[data-ticket-form]')?.append(details);}
+  }catch(e){if(slot.isConnected){slot.replaceChildren(el('p','Não foi possível carregar a associação: '+e.message),button('Tentar novamente',()=>loadBookingLink(c,slot,owner)));}}
+ }
+ function mountBooking(){
+  if(typeof ticketPrivate==='undefined'||typeof ticketIsCurrent!=='function')return;
+  const c=ticketPrivate.current,owner=identity();if(!c||!owner||!ticketIsCurrent(c))return;
+  const slot=c.panel.querySelector('[data-ticket-cloud-slot]');if(!slot||slot.dataset.loadedFor===owner)return;
+  if(!c.panel.querySelector('[data-ticket-locator]'))return;
+  slot.dataset.loadedFor=owner;slot.replaceChildren(el('p','Carregando localizadores da Paineiras…'));void loadBookingLink(c,slot,owner);
+ }
  window.fluidaOpenCloudTickets=async(locator='')=>{await open();if(locator&&panel?.open){const search=panel.querySelector('input[type="search"]'),history=panel.querySelectorAll('.fg-check input')[1];if(search){if(history)history.checked=true;search.value=String(locator);search.oninput();}}};
  function mount(){
   const current=identity(),old=document.getElementById('fluida-gmail-cloud-open');
   if(!current){old?.closest('[data-fluida-gmail-settings]')?.remove();if(panel?.open){panel.close();panel.replaceChildren();}return;}
   if(panel?.open&&stamp!==current){panel.close();panel.replaceChildren();}
+  mountBooking();
   const agenda=document.getElementById('auto-google-state')?.closest('section');
   if(!agenda||old)return;
   const section=el('section',undefined,'crm-details');section.setAttribute('data-fluida-gmail-settings','');
