@@ -1203,6 +1203,9 @@ function loginView(msg){
 
       <button type="button" class="alt" onclick="togglePassword('pw',this)">Mostrar senha</button>
 
+      <p class="m" style="line-height:1.6">O Fluida organiza reservas de passeios, clientes e ingressos. A conex&atilde;o opcional com o Gmail permite localizar ingressos recebidos e associ&aacute;-los &agrave;s reservas.</p>
+      <p class="m"><a href="/privacidade.html" target="_blank" rel="noopener">Pol&iacute;tica de Privacidade</a></p>
+
       ${signingUp ? `
         <ul class="m" id="password-rules">
           <li data-rule="length">Pelo menos 8 caracteres</li>
@@ -6396,3 +6399,4 @@ const publicToken=new URLSearchParams(location.hash.slice(1)).get('conferir');
 if(publicToken)crmPublicConfirmation(publicToken);else startWithRecovery();
 
 </script></body></html>
+
