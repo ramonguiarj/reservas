@@ -19,9 +19,9 @@
   const popup=window.open('about:blank','_blank');if(!popup)throw Error('Permita abrir a aba do Google para conectar o Gmail.');popup.opener=null;
   try{const r=await api('connect'),url=new URL(r.url);if(url.origin!=='https://accounts.google.com')throw Error('Endereço de autorização inválido.');popup.location.replace(url.href);}catch(e){popup.close();throw e;}
  }
- async function pdf(id){
+ async function pdf(id,owner=stamp){
   const popup=window.open('about:blank','_blank');if(!popup)throw Error('Permita abrir a aba do PDF neste navegador.');popup.opener=null;
-  try{const r=await api('pdf',{document_id:id}),url=new URL(r.url);if(url.protocol!=='https:'||url.origin!==new URL(SUPABASE_URL).origin)throw Error('Endereço do ingresso inválido.');popup.location.replace(url.href);}catch(e){popup.close();throw e;}
+  try{const r=await api('pdf',{document_id:id},owner),url=new URL(r.url);if(url.protocol!=='https:'||url.origin!==new URL(SUPABASE_URL).origin)throw Error('Endereço do ingresso inválido.');popup.location.replace(url.href);}catch(e){popup.close();throw e;}
  }
  async function refresh(){
   const data=await api('cloud-status');panel.replaceChildren();
@@ -79,6 +79,23 @@
   if(!panel){panel=el('dialog',undefined,'fg-panel');panel.setAttribute('aria-label','Ingressos do Gmail');document.body.append(panel);}
   panel.replaceChildren(button('Fechar',async()=>panel.close(),'fg-button fg-secondary'),el('p','Consultando ingressos…'));if(!panel.open)panel.showModal();try{await refresh();}finally{busy=false;}
  }
+ async function loadBookingPdfs(c,box,owner){
+  if(box.dataset.loading==='true')return;box.dataset.loading='true';
+  try{
+   const docs=await api('booking-documents',{booking_id:c.id},owner);
+   if(!box.isConnected||identity()!==owner||!ticketIsCurrent(c))return;
+   box.replaceChildren(el('h4','Ingressos associados automaticamente'));
+   box.append(button('Atualizar PDFs da reserva',()=>loadBookingPdfs(c,box,owner)));
+   if(!docs.length)box.append(el('p','Nenhum PDF associado ainda. Depois de salvar o localizador, a busca automática fará a conferência.'));
+   for(const doc of docs){
+    const row=el('div');row.style.cssText='padding:12px 0;border-bottom:1px solid #ddd';
+    row.append(el('strong',doc.filename||'Ingresso PDF'),el('p',String(doc.locator||'').replace(/^PAINEIRAS:/,'')+' · Visita: '+date(doc.visit_date)));
+    const status=el('p');status.setAttribute('role','status');
+    row.append(button('Abrir PDF do ingresso',async()=>{try{if(!ticketIsCurrent(c)||identity()!==owner)throw Error('Reabra a reserva para consultar o PDF.');await pdf(doc.id,owner);}catch(e){status.textContent=e.message;}}),status);box.append(row);
+   }
+  }catch(e){if(box.isConnected)box.replaceChildren(el('p','Não foi possível consultar os PDFs associados: '+e.message),button('Tentar novamente',()=>loadBookingPdfs(c,box,owner)));}
+  finally{box.dataset.loading='false';box.dataset.nextRefresh=String(Date.now()+20000);}
+ }
  async function loadBookingLink(c,slot,owner){
   try{
    const data=await api('cloud-status',{},owner);
@@ -117,6 +134,8 @@
  function mountBooking(){
   if(typeof ticketPrivate==='undefined'||typeof ticketIsCurrent!=='function')return;
   const c=ticketPrivate.current,owner=identity();if(!c||!owner||!ticketIsCurrent(c))return;
+  const files=c.panel.querySelector('[data-ticket-cloud-files]');
+  if(files&&c.panel.classList.contains('active')&&!document.hidden&&Date.now()>=Number(files.dataset.nextRefresh||0))void loadBookingPdfs(c,files,owner);
   const slot=c.panel.querySelector('[data-ticket-cloud-slot]');if(!slot||slot.dataset.loadedFor===owner)return;
   if(!c.panel.querySelector('[data-ticket-locator]'))return;
   slot.dataset.loadedFor=owner;slot.replaceChildren(el('p','Carregando localizadores da Paineiras…'));void loadBookingLink(c,slot,owner);
