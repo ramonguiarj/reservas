@@ -5621,6 +5621,16 @@ function customerMapFilteredRows(all=customerMapAllRows()){
     return [{...c,filteredTours:tours,people:1,missingPax:false,booking:null}];
   });
 }
+function customerMapParticipantTotal(rows=allAccountBookings){
+ const seen=new Set();let people=0,missing=0;
+ for(const b of rows){
+  if(b.deleted_at||b.status==='cancelada'||seen.has(b.id))continue;
+  seen.add(b.id);
+  const raw=b.pax??bookingServices(b)[0]?.pax,n=Number(raw);
+  if(raw!==null&&raw!==''&&Number.isSafeInteger(n)&&n>0)people+=n;else missing++;
+ }
+ return {people,missing};
+}
 function customerMapStats(){
   const all=customerMapAllRows(),rows=customerMapFilteredRows(all);
   const bucket=list=>({people:list.length,reservations:list.reduce((n,c)=>n+c.filteredTours.length,0),missingPax:0});
@@ -5691,9 +5701,10 @@ const mapDashboardBody_impl3 = function(){
   const name=region==='unknown'?'Origem não identificada':selected?.name|| (level==='state'?'Brasil':scope?MAP_CONTINENTS.find(c=>c.id===scope)?.name:'Todas as origens');
   const ranking=regions.filter(r=>r.people).sort((a,b)=>b.people-a.people||a.name.localeCompare(b.name,'pt-BR'));
   const undated=stats.all.filter(c=>!c.tours.length).length,past=stats.all.filter(c=>c.tours.some(t=>t.date<crmToday())).length;
+  const participants=customerMapParticipantTotal();
   return `<div class="dashboard-map-head"><div><span class="nr-kicker">Clientes e histórico</span><h3>De onde vêm seus clientes</h3><p>Cadastros de clientes e reservas do Fluida em um só mapa.</p></div></div>
   ${!centralCustomersAvailable?'<p class="fin-notice" role="status">Cadastro central indisponível. O mapa está parcial; clique em Atualizar clientes e passeios.</p>':''}
-  <div class="crm-stats customer-map-stats">${v8Card('Total de clientes',stats.all.length,'Cada cadastro conta uma vez, independentemente da finalização da reserva.')}${v8Card('Clientes únicos na seleção',rows.length)}${v8Card('Reservas na seleção',new Set(rows.flatMap(c=>c.filteredTours.map(t=>t.bookingId).filter(Boolean))).size)}${v8Card('Passeios na seleção',rows.reduce((n,c)=>n+c.filteredTours.length,0))}${v8Card('Participações nos passeios',rows.reduce((n,c)=>n+c.filteredTours.reduce((sum,t)=>sum+Number(t.pax||0),0),0),'Uma pessoa em dois passeios conta duas participações.')}${v8Card('Clientes no mapa / filtro',stats.rows.length)}${v8Card('Com data anterior a hoje',past)}${v8Card('Sem data disponível',undated)}</div>
+  <div class="crm-stats customer-map-stats">${v8Card('Total de clientes',stats.all.length,'Cada cadastro conta uma vez, independentemente da finalização da reserva.')}${v8Card('Total de participantes',participants.people,'Soma das pessoas por reserva aberta ou finalizada, uma vez por reserva. A mesma pessoa em reservas diferentes pode contar novamente.'+(participants.missing?' '+participants.missing+' reserva(s) sem quantidade válida.':''))}${v8Card('Clientes únicos na seleção',rows.length)}${v8Card('Reservas na seleção',new Set(rows.flatMap(c=>c.filteredTours.map(t=>t.bookingId).filter(Boolean))).size)}${v8Card('Passeios na seleção',rows.reduce((n,c)=>n+c.filteredTours.length,0))}${v8Card('Participações nos passeios',rows.reduce((n,c)=>n+c.filteredTours.reduce((sum,t)=>sum+Number(t.pax||0),0),0),'Uma pessoa em dois passeios conta duas participações.')}${v8Card('Clientes no mapa / filtro',stats.rows.length)}${v8Card('Com data anterior a hoje',past)}${v8Card('Sem data disponível',undated)}</div>
   ${customerMapFiltersHTML(stats)}
   <div class="origin-levels" aria-label="Visualização do mapa">${[['continent','Continentes'],['country','Países'],['state','Estados do Brasil']].map(([k,v])=>`<button class="alt" type="button" aria-pressed="${level===k}" onclick="customerMapPage=1;mapSetLevel('${k}')">${v}</button>`).join('')}</div>
   <div class="origin-filters"><div><label for="map-region-select">Selecionar ${label} no mapa</label><select id="map-region-select" onchange="customerMapPage=1;mapRegionSelect(this.value)">${customerMapOptions(regions.map(r=>[r.id,r.name+' · '+r.people+' cliente(s)']),region,'Todas as regiões desta visualização')}${unknown.length?`<option value="unknown" ${region==='unknown'?'selected':''}>Não identificada · ${unknown.length} cliente(s)</option>`:''}</select></div></div>
