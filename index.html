@@ -3264,7 +3264,7 @@ function definitiveBookingError(result){
  const code=String(result.error?.code||'');
  return /^(22|23|28|42)/.test(code)||['PGRST202','PGRST204','40001'].includes(code);
 }
-async function submitPendingBooking(pending){
+async function submitPendingBookingOnline(pending){
   const session=fluidaSessionStamp();
   const result=await db.rpc(pending.kind==='payment'?'add_payment_atomic':'fluida_save_booking_v10',pending.kind==='payment'?pending.args:{...pending.args,p_customer_sync:pending.customerSync||null,p_crm_origin:pending.crmOrigin?.id||null});
   fluidaAssertSession(session);
@@ -3297,6 +3297,7 @@ async function finishBookingSave_impl1(bookingId,sendEmail,kind){
 }
 let bookingSaveInProgress=false;
 async function saveBooking_impl1(id,sendEmail=false){
+  if(id&&foState?.queue.some(x=>x.localId===id))return notifyUser("Esta reserva já tem alteração local. Confira ou sincronize a fila antes de editar novamente.");
   if(bookingSaveInProgress) return;
   bookingSaveInProgress=true;
   try{
@@ -3585,6 +3586,7 @@ async function deleteBooking_impl1(id){
 // ===============================
 
 async function addPay_impl1(bid){
+  if(foState?.queue.some(x=>x.localId===bid))return notifyUser("Sincronize a alteração pendente desta reserva antes de adicionar outro lançamento.");
   if(bookingSaveInProgress) return;
   if(!canAdd()) return notifyUser('Seu nível de acesso não permite adicionar pagamentos.');
   if(crmUnknownPrice(bookings.find(b=>b.id===bid)||{}))return notifyUser('Defina o valor contratado da reserva antes de registrar pagamento.');
@@ -4946,7 +4948,7 @@ function finConfig(){
     ...finData.settings?.config,itinerary_points:{...finDefaultPoints(),...(finData.settings?.config?.itinerary_points||{})},
     services:bookingServices,transport_resolver:(b,s)=>voucherCatalogTransport(b,s,finData.catalog)};
 }
-async function finLoadData(){
+async function finLoadData(){if(fluidaOfflineMode||!navigator.onLine)return;
   if(!canManage()){finData={...finData,ready:false,error:'Seu perfil não permite acessar custos e resultados.'};return;}
   try{
     const results=await Promise.all([db.from('finance_settings').select('*').eq('account_id',acc.id).limit(2),loadAllAccountRows('finance_service_overrides'),loadAllAccountRows('finance_expenses'),loadAllAccountRows('finance_payment_details'),loadAllAccountRows('itineraries')]);
@@ -5310,8 +5312,8 @@ function crmDateValue(s){return String(s||'').slice(0,10);}
 function crmUnknownPrice(b){return !!(b.voucher_options?.price_pending||b.schedule_items?.some(s=>s.price_pending));}
 function crmOptionalMoney(raw){return String(raw??'').trim()===''?null:moneyCents(String(raw))/100;}
 function crmQuoteTotal(p){if(!Array.isArray(p.items)||!p.items.length)return null;let total=0;for(const i of p.items){if(i.unit===null||i.unit===undefined||i.unit===''||!Number.isFinite(Number(i.unit))||!Number.isSafeInteger(Number(i.qty))||Number(i.qty)<1)return null;total+=Math.round(Number(i.unit)*100)*Number(i.qty);}const discount=Math.round(Number(p.discount||0)*100);return Math.max(0,total-discount)/100;}
-async function crmCatalog(){if(crmCatalogMemo&&crmCatalogMemo.account===acc.id&&Date.now()-crmCatalogMemo.at<60000)return {data:crmCatalogMemo.data};const result=await db.from('itineraries').select('*').eq('account_id',acc.id).order('name');if(!result.error)crmCatalogMemo={account:acc.id,at:Date.now(),data:result.data};return result;}
-async function crmLoad(){const session=fluidaSessionStamp();try{const rows=await loadAllAccountRows('fluida_records');fluidaAssertSession(session);crmRows=rows;crmReady=true;crmError='';}catch(e){fluidaAssertSession(session);crmReady=false;crmError=e.message;crmRows=[];}}
+async function crmCatalog(){if(fluidaOfflineMode||!navigator.onLine)return {data:itineraryVoucherCatalog};if(crmCatalogMemo&&crmCatalogMemo.account===acc.id&&Date.now()-crmCatalogMemo.at<60000)return {data:crmCatalogMemo.data};const result=await db.from('itineraries').select('*').eq('account_id',acc.id).order('name');if(!result.error)crmCatalogMemo={account:acc.id,at:Date.now(),data:result.data};return result;}
+async function crmLoad(){if(fluidaOfflineMode||!navigator.onLine)return;const session=fluidaSessionStamp();try{const rows=await loadAllAccountRows('fluida_records');fluidaAssertSession(session);crmRows=rows;crmReady=true;crmError='';}catch(e){fluidaAssertSession(session);crmReady=false;crmError=e.message;crmRows=[];}}
 function crmUnavailable_impl1(){return crmReady?'':`<div class="crm-notice" role="status">As funções de reserva continuam disponíveis. Para ativar CRM, tarefas e gestão compartilhada, instale o arquivo <b>preparar-banco-fluida.sql</b> desta atualização.${crmError?'<details><summary>Detalhes</summary>'+esc(crmError)+'</details>':''}</div>`;}
 function crmButton(kind,label,booking='',customer=''){return canAdd()&&(!['cost','settlement','rule'].includes(kind)||canManage())?`<button type="button" class="${kind==='lead'?'lime':'alt'}" onclick="crmOpen('${kind}','','${esc(booking)}','${esc(customer)}')" ${crmReady?'':'disabled'}>${esc(label)}</button>`:'';}
 function crmFind(id){return crmRows.find(r=>r.id===id);}
@@ -5402,7 +5404,7 @@ async function crmOpenAttachment(id){const row=crmFind(id);if(!row)return;const 
 function crmWhatsApp_impl1(id){const b=bookings.find(x=>x.id===id);const phone=String(b?.client_phone||'').replace(/\D/g,'');if(!phone)return notifyUser('Informe o telefone antes de abrir o WhatsApp.');window.open('https://wa.me/'+(phone.length<=11?'55':'')+phone,'_blank','noopener,noreferrer');}
 async function crmConvert_impl1(id){const row=crmFind(id);if(!row||!canAdd())return;const linked=row.payload.converted_booking||bookings.find(b=>b.voucher_options?.crm_origin===id)?.id;if(linked)return openBooking(linked);const opened=await openBooking();if(opened===false)return;if(!$('#c_name'))return;const p=row.payload;crmConversion={id:row.id,kind:row.kind};$('#c_name').value=p.title||'';$('#c_tel').value=p.phone||'';$('#c_email').value=p.email||'';if(p.date)$('#c_dt').value=p.date;if(p.time)$('#c_hr').value=p.time;if(p.pax)$('#c_px').value=p.pax;const select=$('#c_it');const matching=[...select.options].find(o=>o.value===p.tour);if(matching){select.value=p.tour;applyItineraryPrice(select);}else if(p.tour){select.selectedIndex=select.options.length-1;applyItineraryPrice(select);$('#c_custom_itinerary').value=p.tour;}
  const total=row.kind==='quote'?crmQuoteTotal(p):p.amount;if(total!==null&&total!==undefined)$('#c_tt').value=Number(total).toFixed(2);$('#c_nt').value=p.notes||'';if(row.kind==='quote'&&p.items?.length){const summary=p.items.map(i=>`${i.qty} × ${i.name}${i.unit===null?' · valor a definir':' · '+brl(i.unit)}`).join('\n');$('#c_client_message').value='Itens da proposta:\n'+summary;$('#c_nt').value=($('#c_nt').value+'\nOrigem: proposta '+row.id).trim();}updateGrandTotal();notifyUser('Dados preenchidos. Complete somente nome, data, roteiro e pessoas para salvar.');}
-async function crmAfterConversion(bookingId){if(!crmConversion)return;const row=crmFind(crmConversion.id);if(!row)return;try{await crmWrite(row.kind,{...row.payload,converted_booking:bookingId,...(row.kind==='lead'?{stage:'ganho'}:{status:'aceito'})},row,{booking_id:bookingId});crmConversion=null;}catch(e){notifyUser('Reserva salva. O vínculo com o CRM não foi confirmado: '+e.message);}}
+async function crmAfterConversion(bookingId){if(fluidaOfflineMode||!navigator.onLine)return;if(!crmConversion)return;const row=crmFind(crmConversion.id);if(!row)return;try{await crmWrite(row.kind,{...row.payload,converted_booking:bookingId,...(row.kind==='lead'?{stage:'ganho'}:{status:'aceito'})},row,{booking_id:bookingId});crmConversion=null;}catch(e){notifyUser('Reserva salva. O vínculo com o CRM não foi confirmado: '+e.message);}}
 async function crmUsePackage(id){const r=crmFind(id);if(!r)return;const opened=await crmOpen('quote');if(opened===false||!$('#crm-f-tour'))return;$('#crm-f-tour').value=r.payload.tour||'';$('#crm-f-notes').value=r.payload.notes||'';$('#crm-f-discount').value=r.payload.discount??'';$('#crm-items').innerHTML=(r.payload.items||[]).map(crmItemHTML).join('');}
 function crmPrintQuote_impl1(id){const r=crmFind(id);if(!r)return;const p=r.payload,total=crmQuoteTotal(p);const doc=`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Proposta · ${esc(p.title)}</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f5ef;color:#173234;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Avenir Next","Segoe UI",Arial,sans-serif}main{max-width:780px;margin:24px auto;padding:24px;background:#fff;border:1px solid #d7dfd7;border-radius:14px}h1{font-size:28px;line-height:1.2;color:#07383a}h2{font-size:20px}h3{font-size:18px}table{width:100%;border-collapse:collapse}th,td{padding:12px 8px;border-bottom:1px solid #d7dfd7;text-align:left;font-size:14px;overflow-wrap:anywhere}.section{break-inside:avoid}.notes,.note{white-space:pre-wrap}button{font:inherit;min-height:44px;padding:10px 16px;border:0;border-radius:10px;background:#07383a;color:#fff;cursor:pointer}.print{margin:16px 0}@media(max-width:600px){main{margin:8px;padding:16px;border-radius:12px}h1{font-size:24px}th,td{padding:9px 5px;font-size:13px}}@media print{body{background:#fff}main{margin:0;border:0;border-radius:0;padding:0}.print,button,.help{display:none}tr,.section{break-inside:avoid}}</style><h1>${esc(acc.name||'Fluida')} · Proposta</h1><h2>${esc(p.title)}</h2><p>${esc(p.tour||'Roteiro a combinar')}<br>${p.date?dBR(p.date):'Data a combinar'} ${esc(p.time||'')} · ${p.pax?Number(p.pax)+' pessoa(s)':'Pessoas a definir'}</p><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor unitário</th></tr></thead><tbody>${(p.items||[]).map(i=>`<tr><td>${esc(i.name)}</td><td>${Number(i.qty)}</td><td>${i.unit===null?'A definir':brl(i.unit)}</td></tr>`).join('')}</tbody></table><p>Desconto: ${brl(p.discount||0)}</p><h2>Total: ${total===null?'A definir':brl(total)}</h2>${p.valid_until?'<p>Válido até '+dBR(p.valid_until)+'</p>':''}<p class="note">${esc(fluidaPaymentNote(p.notes))}</p><p>Esta proposta não confirma disponibilidade nem pagamento.</p></html>`;crmDownload('proposta-'+r.id.slice(0,8)+'.html',doc,'text/html');}
 function crmEnhanceBooking_impl1(id,b){
@@ -5507,7 +5509,7 @@ const crmTodayView_impl2 = function(){return fluidaTodayOriginal();};
 const fluidaBookingEnhanceOriginal=crmEnhanceBooking_impl1;
 const crmEnhanceBooking_impl2 = function(id,b){fluidaBookingEnhanceOriginal(id,b);if(id)fluidaMountPaymentSelector(b);else{const date=$('#c_dt');if(date){const hint=document.createElement('p');hint.id='fluida-date-hint';hint.className='crm-notice';hint.setAttribute('role','status');date.after(hint);const refresh=()=>{const guide=fluidaEffectiveGuide({guide_user_id:$('#c_guide')?.value});const blocks=fluidaBlocksOn(date.value).filter(r=>fluidaBlockApplies(r.payload,guide));hint.hidden=!blocks.length;hint.textContent=blocks.length?'Há bloqueio nesta data: '+blocks.map(r=>r.payload.title).join(', ')+'. Confira na Agenda antes de reservar.':'';};date.addEventListener('change',refresh);$('#c_guide')?.addEventListener('change',refresh);refresh();}}};
 
-async function fluidaRefreshCalendarBlocks(){
+async function fluidaRefreshCalendarBlocks(){if(fluidaOfflineMode||!navigator.onLine)return true;
  try{const rows=await loadAllAccountRows('fluida_records','*',q=>q.eq('kind','availability'));crmRows=[...crmRows.filter(r=>r.kind!=='availability'),...rows];return true;}
  catch(e){notifyUser('Não foi possível conferir a disponibilidade. Nenhuma nova data foi salva. '+e.message,{persistent:true});return false;}
 }
@@ -6090,7 +6092,7 @@ async function fluidaRenderAudit(host,id,more=false){
 }
 
 // Shared versioned mutations, with replay of the same operation after lost responses.
-async function fluidaRunMutation(booking,action,extra={}){
+async function fluidaRunMutation(booking,action,extra={}){if(fluidaOfflineMode||!navigator.onLine)return notifyUser('Esta ação precisa de conexão. Você pode editar os dados da reserva e registrar pagamentos offline.');
  if(fluidaMutationBusy.has(booking.id))return false;fluidaMutationBusy.add(booking.id);
  const key='fluida-action:'+acc.id+':'+me.user_id+':'+booking.id;
  try{let pending;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch{throw Error('Tentativa ilegível. Confira a reserva antes de continuar.');}
@@ -6174,15 +6176,15 @@ async function fluidaLoadWorkspaceBookings(){
 }
 async function fluidaLoadWorkspacePayments(reservations){if(fluidaHistoryRequested)return loadAllAccountRows('payments');const rows=[];for(let i=0;i<reservations.length;i+=150){const ids=reservations.slice(i,i+150).map(b=>b.id);rows.push(...await loadAllAccountRows('payments','*',q=>q.in('booking_id',ids)));}return rows;}
 async function fluidaEnsureHistory(){if(fluidaHistoryReady)return;fluidaHistoryRequested=true;await load();if(!fluidaHistoryReady)await load();}
-async function fluidaFetchBooking(id){const stamp=fluidaSessionStamp();const [b,p]=await Promise.all([db.from('bookings').select('*').eq('account_id',acc.id).eq('id',id).maybeSingle(),db.from('payments').select('*').eq('account_id',acc.id).eq('booking_id',id)]);if(b.error||p.error)throw Error(b.error?.message||p.error.message);fluidaAssertSession(stamp);if(!b.data||b.data.deleted_at)throw Error('Reserva indisponível. Confira os registros ocultos.');const row={...b.data,payments:p.data||[]};allAccountBookings=[...allAccountBookings.filter(b=>b.id!==id),row];bookings=allAccountBookings.filter(b=>!b.deleted_at);summaryBookings=bookings;}
+async function fluidaFetchBooking(id){if(fluidaOfflineMode||!navigator.onLine){if(bookings.some(b=>b.id===id))return;throw Error("Esta reserva não foi baixada para este dispositivo.");}const stamp=fluidaSessionStamp();const [b,p]=await Promise.all([db.from('bookings').select('*').eq('account_id',acc.id).eq('id',id).maybeSingle(),db.from('payments').select('*').eq('account_id',acc.id).eq('booking_id',id)]);if(b.error||p.error)throw Error(b.error?.message||p.error.message);fluidaAssertSession(stamp);if(!b.data||b.data.deleted_at)throw Error('Reserva indisponível. Confira os registros ocultos.');const row={...b.data,payments:p.data||[]};allAccountBookings=[...allAccountBookings.filter(b=>b.id!==id),row];bookings=allAccountBookings.filter(b=>!b.deleted_at);summaryBookings=bookings;}
 async function fluidaLoadSavedHistory(){const id=$('#dlg').dataset.savedBookingId;const host=$('#sv-panel-historico');if(!host||!id)return;host.innerHTML='<p role="status">Carregando histórico completo…</p>';try{await fluidaEnsureHistory();if(host.isConnected)host.innerHTML=fluidaSavedCustomerHistory(bookings.find(b=>b.id===id));}catch(e){if(host.isConnected)host.textContent=e.message;}}
 
 
-</script><script>// Public entry points: composed once, never replaced at runtime.
-const start = start_impl2;
-const logout = logout_impl4;
-const load = load_impl3;
-const render = render_impl2;
+</script><script src="/offline-core.js"></script><script src="/fluida-offline.js"></script><script>// Public entry points: composed once, never replaced at runtime.
+const start = foStart;
+const logout = foLogout;
+const load = foLoad;
+const render = foRender;
 const setActiveTab = setActiveTab_impl2;
 const calendarView = calendarView_impl2;
 const dayBookingsView = dayBookingsView_impl2;
@@ -6201,7 +6203,7 @@ const financeView = financeView_impl2;
 const openBooking = openBooking_impl5;
 const setBookingTab = setBookingTab_impl2;
 const updateGrandTotal = updateGrandTotal_impl2;
-const finishBookingSave = finishBookingSave_impl3;
+const finishBookingSave = foFinish;
 const saveBooking = saveBooking_impl2;
 const deleteBooking = deleteBooking_impl2;
 const addPay = addPay_impl2;
