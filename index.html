@@ -139,7 +139,7 @@ main{max-width:none;padding:0}
 .origin-region path,.origin-region circle{vector-effect:non-scaling-stroke}
 .origin-region:focus{outline:2px solid #244b36;outline-offset:2px}
 .origin-small-region{stroke-width:.8;fill:inherit}
-.origin-state-label{fill:#173c2b;stroke:#fff;stroke-width:2.2;paint-order:stroke;text-anchor:middle;font-size:12px;font-weight:700;pointer-events:none}
+.origin-state-count{font-size:10px!important;font-weight:800}.origin-state-label{fill:#173c2b;stroke:#fff;stroke-width:2.2;paint-order:stroke;text-anchor:middle;font-size:12px;font-weight:700;pointer-events:none}
 .origin-detail{background:#f5f8f3;border:1px solid var(--line);border-radius:10px;padding:20px 16px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;color:var(--g)}
 .origin-detail-label{font-size:16px;font-weight:700;overflow-wrap:anywhere}
 .origin-detail strong{font-size:46px;line-height:1.2;margin:8px 0 0}
@@ -1954,7 +1954,7 @@ function mapQuantity(count,label='pessoa',plural='pessoas'){return `${count.toLo
 function mapRegionSelect(id){
   const valid=id==='unknown'||mapRegions(mapBuildStats()).some(r=>r.id===id);
   if(id&&!valid)return;
-  originMapState.region=id;mapRefresh();
+  customerMapPage=1;originMapState.region=id;mapRefresh();
 }
 function mapSetLevel(level,scope=''){
   if(!['continent','country','state'].includes(level))return;
@@ -1993,7 +1993,7 @@ function mapSVG_impl1(regions){
     const small=level==='country'&&(maxX-minX<2.5||maxY-minY<2.5);
     // Tiny territories have a larger selectable marker as an alternative to their polygon.
     const mark=small?`<circle class="origin-small-region" cx="${x}" cy="${y}" r="${scope?1.2:2.1}"/>`:'';
-    const label=level==='state'?`<text x="${x}" y="${y}" class="origin-state-label" dy=".35em">${r.id}</text>`:'';
+    const label=level==='state'?`<text x="${x}" y="${y}" class="origin-state-label" dy="-.3em">${r.id}</text><text x="${x}" y="${y}" class="origin-state-label origin-state-count" dy="1.1em">${r.people}</text>`:'';
     return mapShape(r,r.path,mark+label);
   }).join('');
   const graticule=level==='state'?'':`<path class="world-graticule" d="M0 100H800M0 200H800M0 300H800M200 0V400M400 0V400M600 0V400"/>`;
@@ -5678,10 +5678,10 @@ function customerMapFiltersHTML(stats){
 function customerMapList(rows){
   const size=25,total=rows.length;customerMapPage=Math.min(customerMapPage,Math.max(1,Math.ceil(total/size)));
   const selected=rows.slice((customerMapPage-1)*size,customerMapPage*size);
-  return `<section class="fluida-map-results"><h3>Clientes da seleção · ${total}</h3><div class="fin-table-scroll"><table class="client-list"><thead><tr><th>Cliente</th><th>Origem</th><th>Telefone</th><th>Passeios no filtro</th><th></th></tr></thead><tbody>${selected.map(c=>{
+  return `<section class="fluida-map-results"><h3>Clientes da seleção · ${total}</h3><p>Clientes atribuídos à região selecionada e suas reservas, incluindo reservas ainda não finalizadas.</p><div class="fin-table-scroll"><table class="client-list"><thead><tr><th>Cliente</th><th>Origem</th><th>Telefone</th><th>Passeios no filtro</th><th></th></tr></thead><tbody>${selected.map(c=>{
     const country=mapCountryById.get(c.country),state=MAP_STATES.find(s=>s.id===c.state),continent=MAP_CONTINENTS.find(s=>s.id===c.continent);
     const origin=[state?.name,country?.name||(!c.country?continent?.name:'')].filter(Boolean).join(' · ')||'Não identificada';
-    return `<tr><td>${esc(c.name)}</td><td>${esc(origin)}<br><small>${esc(c.reason)}</small></td><td>${esc(c.phone||'Não informado')}</td><td>${c.filteredTours.length?c.filteredTours.map(t=>`<div>${dBR(t.date)} · ${esc(t.itinerary||'Passeio')}<br><small>${t.date<crmToday()?'Data anterior a hoje':'Agendado'} · ${esc(t.source)}</small></div>`).join(''):'Sem data de passeio disponível'}</td><td>${c.customerId?`<button class="alt" type="button" onclick="showCustomerHistory('${customerEncodedKey('customer:'+c.customerId)}')">Ver cliente</button>`:''}${[...new Set(c.filteredTours.map(t=>t.bookingId).filter(Boolean))].slice(0,3).map(id=>`<button class="alt" type="button" onclick="openBooking('${esc(id)}')">Abrir reserva</button>`).join('')}</td></tr>`;
+    return `<tr><td>${esc(c.name)}</td><td>${esc(origin)}<br><small>${esc(c.reason)}</small></td><td>${esc(c.phone||'Não informado')}</td><td>${c.filteredTours.length?c.filteredTours.map(t=>`<div>${dBR(t.date)} · ${esc(t.itinerary||'Passeio')}<br><small>${t.status==='finalizada'?'Finalizada':t.status==='aberta'?'Reserva aberta':t.status==='cancelada'?'Cancelada':t.date<crmToday()?'Data anterior a hoje':'Agendado'} · ${esc(t.source)}</small></div>`).join(''):'Sem data de passeio disponível'}</td><td>${c.customerId?`<button class="alt" type="button" onclick="showCustomerHistory('${customerEncodedKey('customer:'+c.customerId)}')">Ver cliente</button>`:''}${[...new Set(c.filteredTours.map(t=>t.bookingId).filter(Boolean))].slice(0,3).map(id=>`<button class="alt" type="button" onclick="openBooking('${esc(id)}')">Abrir reserva</button>`).join('')}</td></tr>`;
   }).join('')||'<tr><td colspan="5">Nenhum cliente nesta seleção.</td></tr>'}</tbody></table></div>${total>size?`<div class="crm-pagination"><button class="alt" type="button" ${customerMapPage<=1?'disabled':''} onclick="customerMapPage--;mapRefresh()">Anterior</button><span>${customerMapPage} / ${Math.ceil(total/size)}</span><button class="alt" type="button" ${customerMapPage*size>=total?'disabled':''} onclick="customerMapPage++;mapRefresh()">Próxima</button></div>`:''}</section>`;
 }
 const mapDashboardBody_impl3 = function(){
@@ -5693,16 +5693,16 @@ const mapDashboardBody_impl3 = function(){
   const undated=stats.all.filter(c=>!c.tours.length).length,past=stats.all.filter(c=>c.tours.some(t=>t.date<crmToday())).length;
   return `<div class="dashboard-map-head"><div><span class="nr-kicker">Clientes e histórico</span><h3>De onde vêm seus clientes</h3><p>Cadastros de clientes e reservas do Fluida em um só mapa.</p></div></div>
   ${!centralCustomersAvailable?'<p class="fin-notice" role="status">Cadastro central indisponível. O mapa está parcial; clique em Atualizar clientes e passeios.</p>':''}
-  <div class="crm-stats customer-map-stats">${v8Card('Clientes únicos na seleção',rows.length)}${v8Card('Reservas na seleção',new Set(rows.flatMap(c=>c.filteredTours.map(t=>t.bookingId).filter(Boolean))).size)}${v8Card('Passeios na seleção',rows.reduce((n,c)=>n+c.filteredTours.length,0))}${v8Card('Participações nos passeios',rows.reduce((n,c)=>n+c.filteredTours.reduce((sum,t)=>sum+Number(t.pax||0),0),0),'Uma pessoa em dois passeios conta duas participações.')}${v8Card('Clientes no mapa / filtro',stats.rows.length)}${v8Card('Com data anterior a hoje',past)}${v8Card('Sem data disponível',undated)}</div>
+  <div class="crm-stats customer-map-stats">${v8Card('Total de clientes',stats.all.length,'Cada cadastro conta uma vez, independentemente da finalização da reserva.')}${v8Card('Clientes únicos na seleção',rows.length)}${v8Card('Reservas na seleção',new Set(rows.flatMap(c=>c.filteredTours.map(t=>t.bookingId).filter(Boolean))).size)}${v8Card('Passeios na seleção',rows.reduce((n,c)=>n+c.filteredTours.length,0))}${v8Card('Participações nos passeios',rows.reduce((n,c)=>n+c.filteredTours.reduce((sum,t)=>sum+Number(t.pax||0),0),0),'Uma pessoa em dois passeios conta duas participações.')}${v8Card('Clientes no mapa / filtro',stats.rows.length)}${v8Card('Com data anterior a hoje',past)}${v8Card('Sem data disponível',undated)}</div>
   ${customerMapFiltersHTML(stats)}
   <div class="origin-levels" aria-label="Visualização do mapa">${[['continent','Continentes'],['country','Países'],['state','Estados do Brasil']].map(([k,v])=>`<button class="alt" type="button" aria-pressed="${level===k}" onclick="customerMapPage=1;mapSetLevel('${k}')">${v}</button>`).join('')}</div>
   <div class="origin-filters"><div><label for="map-region-select">Selecionar ${label} no mapa</label><select id="map-region-select" onchange="customerMapPage=1;mapRegionSelect(this.value)">${customerMapOptions(regions.map(r=>[r.id,r.name+' · '+r.people+' cliente(s)']),region,'Todas as regiões desta visualização')}${unknown.length?`<option value="unknown" ${region==='unknown'?'selected':''}>Não identificada · ${unknown.length} cliente(s)</option>`:''}</select></div></div>
-  <p class="origin-map-hint">Clique em uma região para ver os clientes. Os filtros acima podem ser combinados.</p>
+  <p class="origin-map-hint">Clique em um estado para ver seus clientes e abrir as reservas. O número abaixo da sigla mostra os clientes no filtro atual. Os filtros acima podem ser combinados.</p>
   <div class="origin-map-layout"><div class="origin-map-canvas">${mapSVG(regions)}</div><aside class="origin-detail" aria-live="polite"><span class="origin-detail-label">${esc(name)}</span><strong id="origin-people-count">${rows.length}</strong><span>clientes únicos</span><p>${stats.bucket(rows).reservations} passeio(s) com data na seleção</p>${selected&&level==='continent'?`<button class="alt" type="button" onclick="mapSetLevel('country','${selected.id}')">Ver países</button>`:''}${selected?.id==='BRA'?'<button class="alt" type="button" onclick="mapSetLevel(\'state\')">Ver estados</button>':''}${region?'<button class="alt" type="button" onclick="mapRegionSelect(\'\')">Limpar seleção do mapa</button>':''}</aside></div>
   <div class="origin-legend"><span><i></i>Sem clientes no filtro</span><span><i class="has-people"></i>Com clientes</span><span><i class="is-selected"></i>Região selecionada</span></div>
   ${unknown.length?`<button class="origin-unknown" type="button" onclick="mapRegionSelect('unknown')">${unknown.length} cliente(s) com ${label} não identificado. Ver clientes →</button>`:''}
   ${ranking.length?`<details class="origin-ranking"><summary>Clientes por ${label} · ${ranking.length} regiões</summary><div class="origin-region-list">${ranking.map(r=>`<button class="alt" type="button" onclick="mapRegionSelect('${r.id}')">${esc(r.name)} <b>${r.people}</b></button>`).join('')}</div></details>`:''}
-  <p class="map-note">Cada cliente é contado uma vez na seleção, mesmo com vários passeios. A data do tour vem das reservas do Fluida. Cadastros sem data aparecem em “Todos os anos”; filtros de dia, mês ou ano exigem uma data de passeio.</p>
+  <p class="map-note">O total geral inclui todos os clientes visíveis cadastrados e identificados nas reservas. Cada cliente é contado uma vez na seleção, mesmo com vários passeios. Reservas abertas e finalizadas contam igualmente; não é preciso finalizar a reserva para o cliente aparecer. A data do tour vem das reservas do Fluida. Cadastros sem data aparecem em “Todos os anos”; filtros de dia, mês ou ano exigem uma data de passeio.</p>
   <p class="map-note">País e estado são estimados pelo DDI e DDD do telefone e podem diferir da residência ou nacionalidade. Estados estão disponíveis para números brasileiros. Sem identificação segura, a origem fica não identificada ou utiliza o cadastro informado. Uma data passada não comprova a realização do passeio.</p>
   <p class="map-note">Reservas canceladas e ocultas não fornecem datas ao mapa. O cadastro central continua visível sem data se não tiver outro passeio. Limites: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a> e <a href="https://servicodados.ibge.gov.br/api/docs/malhas?versao=3" target="_blank" rel="noopener noreferrer">IBGE</a>.</p>
   ${customerMapList(rows)}`;
