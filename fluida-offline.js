@@ -129,3 +129,65 @@ window.addEventListener('focus',()=>{if(navigator.onLine)void foSync();});
 setInterval(()=>{if(navigator.onLine&&foState?.queue.length&&!document.hidden)void foSync();},30000);
 foChannel?.addEventListener('message',async e=>{if(e.data?.scope!==foScope)return;await foRead();if(!document.querySelector('dialog[open]')&&foState?.snapshot){foApply(foCore.overlay(foState.snapshot,foState.queue));render();}else foPaint();});
 if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/fluida-sw.js',{updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready).then(()=>{foShellReady=true;foPaint();}).catch(e=>{foError='Não foi possível preparar a abertura offline: '+e.message;foPaint();});
+/* Voucher feedback only. Does not send, retry, or change reservations by itself. */
+(()=>{
+ 'use strict';
+ const receipts=new Map();let receiptScope='';
+ const scoped=()=>{const current=voucherEmailCurrentScope();if(receiptScope!==current){receipts.clear();receiptScope=current;}return current;};
+ const mergeOriginal=voucherEmailMergeImported;
+ voucherEmailMergeImported=function(rows,id=null){
+  scoped();const confirmed=[...receipts.values()].filter(r=>!id||r.booking_id===id);
+  const ids=new Set(confirmed.map(r=>r.request_id));
+  const merged=mergeOriginal(rows,id).filter(r=>!ids.has(r.request_id)||['accepted','delivered'].includes(r.status));
+  const known=new Set(merged.map(r=>r.request_id||r.provider_id));
+  return [...merged,...confirmed.filter(r=>!known.has(r.request_id||r.provider_id))];
+ };
+ const labelOriginal=voucherEmailStatusLabel;
+ voucherEmailStatusLabel=status=>['accepted','delivered'].includes(status)?'Voucher enviado':labelOriginal(status);
+ const inlineOriginal=voucherEmailInlineContent;
+ voucherEmailInlineContent=function(id){
+  scoped();const b=bookings.find(b=>b.id===id),entry=voucherEmailSummaries.get(id),pending=readVoucherEmailPending(id);
+  const item=entry?.latest,email=String(b?.client_email||'').trim().toLowerCase();
+  if(!voucherEmailBusy.has(id)&&email&&['accepted','delivered'].includes(item?.status)&&String(item.recipient||'').trim().toLowerCase()===email&&(!pending?.request_id||pending.request_id===item.request_id)){
+   const note='Envio confirmado em '+voucherEmailDate(voucherEmailWhen(item))+'. A entrega na caixa do cliente ainda pode não estar confirmada.'+(entry?.error||voucherEmailSummaryError?' Histórico temporariamente indisponível; última confirmação preservada.':'');
+   return '<span class="booking-email-status accepted" title="'+esc(note)+'"><span class="booking-email-triangle" aria-hidden="true"></span><span>Voucher enviado</span><span class="booking-email-sr">. '+esc(note)+'</span></span>';
+  }
+  return inlineOriginal(id);
+ };
+ const invokeOriginal=db.functions.invoke.bind(db.functions);
+ db.functions.invoke=async function(name,options){
+  if(name!=='send-booking-voucher')return invokeOriginal(name,options);
+  const scope=scoped(),id=options?.body?.booking_id,request=options?.body?.request_id;
+  const result=await invokeOriginal(name,options),data=result?.data;
+  if(scope===scoped()&&request&&!result.error&&data?.ok&&(data.status==='accepted'||!data.status&&data.id)){
+   // Receipt comes from the existing server response, never from the click itself.
+   try{
+    const booking=bookings.find(b=>b.id===id),pending=readVoucherEmailPending(id),at=new Date().toISOString();
+    const receipt={request_id:request,booking_id:id,account_id:acc.id,requested_by:me.user_id,provider_id:data.provider_id||data.id||null,recipient:data.recipient||booking?.client_email||'',language:booking?.voucher_options?.language||'pt',status:'accepted',created_at:pending?.created_at||at,accepted_at:data.accepted_at||at};
+    receipts.set(request,receipt);
+    const previous=voucherEmailSummaries.get(id)?.latest;
+    voucherEmailRemember(id,voucherEmailMergeImported(previous?[previous]:[],id));
+    refreshVoucherEmailStatus(id);
+   }catch(error){console.warn('Não foi possível atualizar o indicador do voucher.',error);}
+  }
+  return result;
+ };
+ const style=document.createElement('style');style.textContent='#v8-toasts[popover]{inset:auto 12px calc(12px + env(safe-area-inset-bottom)) auto;margin:0;border:0;padding:0;background:transparent;overflow:visible;width:min(440px,calc(100vw - 24px));max-width:calc(100vw - 24px)}';document.head.append(style);
+ function feedback(){
+  const host=document.getElementById('v8-toasts');
+  if(host&&host.children.length){
+   // Toasts inside the active dialog remain accessible and above its backdrop.
+   const parent=[...document.querySelectorAll('dialog[open]')].at(-1)||document.body;
+   if(host.parentElement!==parent)parent.append(host);
+   if(typeof host.showPopover==='function'){host.setAttribute('popover','manual');if(!host.matches(':popover-open'))host.showPopover();}
+   for(const toast of host.children)for(const node of toast.childNodes)if(node.nodeType===3&&/^E-mail enviado/.test(node.textContent))node.textContent=node.textContent.replace(/^E-mail enviado/,'Voucher enviado');
+  }
+  for(const button of document.querySelectorAll('button[onclick]')){
+   const action=button.getAttribute('onclick')||'';
+   if(!action.startsWith('sendBookingVoucher('))continue;
+   if(button.disabled&&button.textContent==='Processando envio…'){button.textContent='Enviando voucher…';button.setAttribute('aria-busy','true');}
+   else if(!button.disabled&&button.hasAttribute('aria-busy'))button.removeAttribute('aria-busy');
+  }
+ }
+ new MutationObserver(feedback).observe(document.body,{subtree:true,childList:true});
+})();
