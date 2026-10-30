@@ -191,3 +191,48 @@ if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.registe
  }
  new MutationObserver(feedback).observe(document.body,{subtree:true,childList:true});
 })();
+/* Read-only delivery feedback. Never sends or retries customer messages. */
+(()=>{
+ 'use strict';
+ let scope='',busy=false,lastPoll=0;const statuses=new Map(),historyRows=new Map();
+ const current=()=>{const next=voucherEmailCurrentScope();if(next!==scope){scope=next;statuses.clear();historyRows.clear();lastPoll=0;}return next;};
+ const statusOf=item=>statuses.get(item?.provider_id)?.delivery_status||item?.delivery_status;
+ const terminal=new Set(['delivered','bounced','complained','failed','suppressed']);
+ const descriptions={delivered:'Entrega confirmada pelo serviço de e-mail. Isso não confirma leitura.',bounced:'O serviço informou devolução do e-mail. Confira o endereço antes de qualquer novo envio.',complained:'O destinatário sinalizou esta mensagem como spam.',failed:'O serviço informou falha na entrega.',suppressed:'O serviço bloqueou a entrega deste e-mail.'};
+ const labels={delivered:'Voucher entregue',bounced:'E-mail devolvido',complained:'E-mail sinalizado como spam',failed:'Falha na entrega',suppressed:'Entrega bloqueada'};
+ function chosen(id){
+  current();const entry=voucherEmailSummaries.get(id),email=String(bookings.find(b=>b.id===id)?.client_email||'').trim().toLowerCase();let item=entry?.latest;
+  const pending=readVoucherEmailPending(id),accepted=entry?.lastAccepted;
+  // A later accepted send supersedes an older local unresolved attempt, never a newer one.
+  if(pending&&accepted&&String(accepted.recipient||'').trim().toLowerCase()===email&&Date.parse(accepted.accepted_at||accepted.created_at)>Date.parse(pending.created_at)&&(!item||Date.parse(accepted.accepted_at||accepted.created_at)>=Date.parse(voucherEmailWhen(item)))){clearVoucherEmailPending(id);item=accepted;voucherEmailSummaries.set(id,{...entry,latest:accepted});}
+  return {item,email,pending:readVoucherEmailPending(id)};
+ }
+ const originalRead=voucherEmailReadRows;
+ voucherEmailReadRows=async function(id=null){
+  const savedScope=current(),rows=await originalRead(id);
+  try{let query=db.from('voucher_email_sends').select('provider_id,delivery_status,delivery_checked_at').eq('account_id',acc.id).limit(1000);if(id)query=query.eq('booking_id',id);const r=await query;if(!r.error&&savedScope===current())for(const row of r.data||[])if(row.provider_id)statuses.set(row.provider_id,row);}catch{}
+  if(savedScope!==current())return rows;
+  const merged=rows.map(r=>({...r,...(statuses.get(r.provider_id)||{})}));if(id)historyRows.set(id,merged);return merged;
+ };
+ const originalSummary=voucherEmailSummaryContent,originalInline=voucherEmailInlineContent;
+ voucherEmailSummaryContent=function(id,detail=false){
+  const {item,pending}=chosen(id),status=statusOf(item);let markup=originalSummary(id,detail);
+  if(!voucherEmailBusy.has(id)&&item?.status==='accepted'&&terminal.has(status)&&(!pending||pending.request_id===item.request_id)){
+   markup=markup.replace('Voucher enviado',esc(labels[status]));if(detail)markup=markup.replace('Envio confirmado pelo serviço de e-mail; a entrega na caixa do cliente ainda não foi confirmada.',esc(descriptions[status]));
+  }
+  return markup;
+ };
+ voucherEmailInlineContent=function(id){
+  const {item,email,pending}=chosen(id),status=statusOf(item);
+  if(!voucherEmailBusy.has(id)&&email&&item?.status==='accepted'&&terminal.has(status)&&String(item.recipient||'').trim().toLowerCase()===email&&(!pending||pending.request_id===item.request_id))return `<span class="booking-email-status ${status==='delivered'?'accepted':'failed'}" title="${esc(descriptions[status])}"><span class="booking-email-triangle" aria-hidden="true"></span><span>${esc(labels[status])}</span><span class="booking-email-sr">. ${esc(descriptions[status])}</span></span>`;
+  return originalInline(id);
+ };
+ async function poll(id=null){
+  const savedScope=current();if(!me||!acc||!navigator.onLine||busy||Date.now()-lastPoll<12000)return;busy=true;lastPoll=Date.now();
+  try{const r=await db.functions.invoke('voucher-delivery-status',{body:{booking_id:id}});if(r.error||savedScope!==current())return;for(const row of r.data?.results||[])if(row.provider_id&&row.delivery_status)statuses.set(row.provider_id,row);const ids=new Set();for(const [bid,entry]of voucherEmailSummaries)if(entry?.latest?.provider_id&&statuses.has(entry.latest.provider_id))ids.add(bid);for(const bid of ids)refreshVoucherEmailStatus(bid);}catch{}finally{busy=false;}
+ }
+ const originalLoad=loadVoucherEmailStatuses;loadVoucherEmailStatuses=async function(){await originalLoad();void poll();};
+ const originalHistory=loadVoucherSendHistory;
+ loadVoucherSendHistory=async function(id){await originalHistory(id);void poll(id);const rows=voucherEmailSort(historyRows.get(id)||[]);for(const box of [document.getElementById('voucher_send_history'),document.getElementById('sv-voucher-send-history')]){if(box?.dataset.bookingId!==id)continue;const entries=[...box.querySelectorAll('.booking-info')];if(entries.length!==rows.length)continue;entries.forEach((el,i)=>{const status=statusOf(rows[i]);if(!terminal.has(status)||rows[i].status!=='accepted')return;const strong=el.querySelector('strong');if(strong)strong.textContent=labels[status];for(const span of el.querySelectorAll('span.m'))span.textContent=span.textContent.replace('A entrega ao destinatário ainda não foi confirmada.',descriptions[status]);});}};
+ setInterval(()=>{if(document.visibilityState==='visible')void poll();},60000);
+})();
