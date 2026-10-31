@@ -274,3 +274,6 @@ if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.registe
   };
  };
 })();
+
+/* Keep the owner's preferred label for cancelling an incorrect receipt. */
+(()=>{const original=fluidaSavedPayments;fluidaSavedPayments=function(b){return original(b).replaceAll('Excluir lançamento','Estornar').replace('Excluir anula o lançamento','Estornar anula o lançamento');};})();
