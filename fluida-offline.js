@@ -236,3 +236,41 @@ if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.registe
  loadVoucherSendHistory=async function(id){await originalHistory(id);void poll(id);const rows=voucherEmailSort(historyRows.get(id)||[]);for(const box of [document.getElementById('voucher_send_history'),document.getElementById('sv-voucher-send-history')]){if(box?.dataset.bookingId!==id)continue;const entries=[...box.querySelectorAll('.booking-info')];if(entries.length!==rows.length)continue;entries.forEach((el,i)=>{const status=statusOf(rows[i]);if(!terminal.has(status)||rows[i].status!=='accepted')return;const strong=el.querySelector('strong');if(strong)strong.textContent=labels[status];for(const span of el.querySelectorAll('span.m'))span.textContent=span.textContent.replace('A entrega ao destinatário ainda não foi confirmada.',descriptions[status]);});}};
  setInterval(()=>{if(document.visibilityState==='visible')void poll();},60000);
 })();
+/* Payment corrections preserve the original receipt and use one atomic, replayable operation. */
+(()=>{
+ const original=fluidaSavedPayments;
+ fluidaSavedPayments=function(b){
+  let html=original(b);if(me?.role!=='owner'||b.status==='cancelada'||Object.keys(b.cancellation||{}).length)return html;
+  const rows=b.payments||[];let index=0;
+  html=html.replace('<th>Situação</th>','<th>Situação</th><th>Ações</th>').replace(/<tr class="([^"]*)">([\s\S]*?)<\/tr>/g,(full,cls,cells)=>{
+   const p=rows[index++];if(!p)return full;
+   return `<tr class="${cls}">${cells}<td>${p.voided?'—':`<button type="button" onclick="fluidaEditPayment('${b.id}','${p.id}')">Editar pagamento</button> <button type="button" class="bad" onclick="voidPay('${p.id}','${b.id}')">Excluir lançamento</button>`}</td></tr>`;
+  }).replace('colspan="5"','colspan="6"');
+  return html.replace('<p class="sv-note">Anular um lançamento','<p class="sv-note">Editar substitui o lançamento por uma versão corrigida. Excluir anula o lançamento e preserva o histórico. Anular um lançamento');
+ };
+ window.fluidaEditPayment=async function(bid,pid){
+  const b=bookings.find(x=>x.id===bid),p=b?.payments?.find(x=>x.id===pid);
+  if(!b||!p||p.voided||me?.role!=='owner')return notifyUser('Pagamento indisponível para correção.');
+  if(fluidaOfflineMode||!navigator.onLine)return notifyUser('A correção de pagamentos precisa de conexão.');
+  if(proBookingIsDirty(bid))return notifyUser('Salve ou descarte as alterações da reserva antes de continuar.');
+  const storageKey='fluida-payment-correction:'+acc.id+':'+me.user_id+':'+pid;let pending;
+  try{pending=JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch{return notifyUser('Tentativa ilegível. Confira o pagamento antes de continuar.');}
+  const data=pending?.p_payment||{...p,reason:''},methods=['Pix','Cartão de crédito','Cartão de débito','Transferência','Dinheiro'],types={sinal:'Sinal',parcial:'Parcial',saldo:'Saldo',total:'Total'};
+  const d=v8Dialog('Editar pagamento',`<p>A correção anula o lançamento original e registra o substituto em uma única operação. O histórico fica preservado.</p><form id="fluida-correction-form"><label>Valor recebido (R$)<input name="amount" type="number" min="0.01" step="0.01" required value="${esc(data.amount)}"></label><label>Data do recebimento<input name="paid_at" type="date" required max="${crmToday()}" value="${esc(String(data.paid_at||'').slice(0,10))}"></label><label>Forma de pagamento<select name="method">${methods.map(m=>`<option${m===data.method?' selected':''}>${esc(m)}</option>`).join('')}</select></label><label>Tipo<select name="payment_type">${Object.entries(types).map(([v,label])=>`<option value="${v}"${v===(data.payment_type||data.type)?' selected':''}>${label}</option>`).join('')}</select></label><label>Parcelas<input name="installments" type="number" min="1" max="99" step="1" required value="${Number(data.installments)||1}"></label><label>Observações<textarea name="notes" maxlength="2000">${esc(data.notes||'')}</textarea></label><label>Motivo da correção<input name="reason" required minlength="3" maxlength="500" value="${esc(data.reason||'')}"></label><p role="status" id="fluida-correction-message"></p><button type="submit">${pending?'Retomar a mesma correção':'Salvar correção'}</button><button type="button" class="alt" id="fluida-correction-close">Voltar</button></form>`);
+  const form=d.querySelector('#fluida-correction-form'),message=d.querySelector('[role=status]'),submit=form.querySelector('[type=submit]'),close=d.querySelector('#fluida-correction-close');let busy=false;
+  d.addEventListener('cancel',e=>{if(busy)e.preventDefault();});d.querySelector('form[method=dialog]')?.addEventListener('submit',e=>{if(busy)e.preventDefault();});
+  const fields=[...form.querySelectorAll('input,select,textarea')];
+  const freeze=on=>{fields.forEach(x=>x.disabled=on);};if(pending)freeze(true);
+  close.onclick=()=>{if(!busy)d.close();};
+  form.onsubmit=async event=>{
+   event.preventDefault();if(busy)return;if(!navigator.onLine)return message.textContent='Conecte-se à internet para continuar.';
+   if(!pending){const values=Object.fromEntries(new FormData(form));if(values.method!=='Cartão de crédito')values.installments='1';pending={p_account_id:acc.id,p_booking_id:bid,p_expected_version:b.write_version,p_request_id:crypto.randomUUID(),p_payment_id:pid,p_payment:values};
+    try{sessionStorage.setItem(storageKey,JSON.stringify(pending));}catch{pending=null;return message.textContent='Não foi possível preparar uma tentativa segura. Tente novamente.';}}
+   busy=true;freeze(true);submit.disabled=true;close.disabled=true;message.textContent='Salvando correção…';const session=fluidaSessionStamp();
+   try{const r=await db.rpc('fluida_correct_payment',pending);fluidaAssertSession(session);if(r.error){if(definitiveBookingError(r)){sessionStorage.removeItem(storageKey);pending=null;}throw Error(r.error.message);}
+    sessionStorage.removeItem(storageKey);fluidaCommitDialog(d);d.close();proDisarmBookingEditor();fluidaCommitDialog(document.getElementById('dlg'));document.getElementById('dlg').close();await load();await openBooking(bid);fluidaSavedTab('financeiro');notifyUser('Pagamento corrigido. O lançamento original foi preservado no histórico.');
+   }catch(e){message.textContent=pending?'Ainda não houve confirmação. Use “Retomar a mesma correção” para conferir, sem duplicar.':e.message;submit.textContent=pending?'Retomar a mesma correção':'Salvar correção';if(!pending)freeze(false);
+   }finally{busy=false;submit.disabled=false;close.disabled=false;}
+  };
+ };
+})();
