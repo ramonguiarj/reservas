@@ -277,3 +277,40 @@ if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.registe
 
 /* Keep the owner's preferred label for cancelling an incorrect receipt. */
 (()=>{const original=fluidaSavedPayments;fluidaSavedPayments=function(b){return original(b).replaceAll('Excluir lançamento','Estornar').replace('Excluir anula o lançamento','Estornar anula o lançamento');};})();
+
+/* Custom route details remain in the existing itinerary field; saved reservations are not rewritten. */
+(()=>{
+ const pointsLabel='Pontos que o cliente vai visitar';
+ const customMarkup=name=>{
+  const points=isCustomItineraryName(name)?'Pontos não informados.':String(name||'').trim();
+  return '<span>Roteiro personalizado</span><small style="display:block;margin-top:6px;white-space:pre-wrap"><strong>'+pointsLabel+':</strong><br>'+esc(points)+'</small>';
+ };
+ const savedText=fluidaSavedText;
+ fluidaSavedText=function(label,value){
+  return label==='Roteiro'&&serviceUsesCustomItinerary(value)
+   ?fluidaSavedRow(label,customMarkup(value)):savedText(label,value);
+ };
+ const savedCart=fluidaSavedCart;
+ fluidaSavedCart=function(booking){
+  let html=savedCart(booking);
+  for(const service of bookingServices(booking)){
+   if(!serviceUsesCustomItinerary(service.itinerary))continue;
+   const old='<td>'+esc(service.itinerary||'A definir')+'<small>';
+   html=html.replace(old,'<td>'+customMarkup(service.itinerary)+'<small>');
+  }
+  return html;
+ };
+ const originalConfig=finConfig;
+ finConfig=function(){const config=originalConfig();if(finData.settings?.config?.ticket_unit_cents==null){config.ticket_unit_cents=8900;if(!config.rule_versions?.length)config.rule_versions=[{from:'1900-01-01',config:{ticket_unit_cents:8700}},{from:'2026-11-01',config:{ticket_unit_cents:8900}}];}return config;};
+ function labelPoints(){
+  for(const label of document.querySelectorAll('#c_custom_itinerary_field label,.schedule-custom-field label')){
+   if(label.textContent!==pointsLabel)label.textContent=pointsLabel;
+  }
+  for(const input of document.querySelectorAll('#c_custom_itinerary,.schedule-custom-name')){
+   const placeholder='Ex.: Cristo Redentor, Mirante Dona Marta e Escadaria Selarón';
+   if(input.placeholder!==placeholder)input.placeholder=placeholder;
+  }
+ }
+ new MutationObserver(labelPoints).observe(document.getElementById('dlg'),{childList:true,subtree:true});
+ labelPoints();
+})();
