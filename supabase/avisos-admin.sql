@@ -1,0 +1,4 @@
+-- Migração fluida_avisos_admin (17/11/2026): fila fluida_tenant_private.admin_notifications.
+-- Gatilhos: convite de negócio aceito (novo guia) e pagamento aplicado (fluida_billing_private.events).
+-- A função fluida-admin-notify envia por e-mail para todos os platform_admins (Resend, remetente "Fluida").
+-- O aviso nunca atrapalha o cadastro ou o pagamento (erros são ignorados nos gatilhos).
