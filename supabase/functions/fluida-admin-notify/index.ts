@@ -10,7 +10,7 @@ Deno.serve(async () => {
   const url = Deno.env.get('SUPABASE_URL') || ''
   const secret = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}').default || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
   const resendKey = Deno.env.get('RESEND_API_KEY') || ''
-  const from = Deno.env.get('FLUIDA_FROM_EMAIL') || 'reservas@envio.ramonguiarj.com.br'
+  const from = Deno.env.get('FLUIDA_FROM_EMAIL') || 'reservas@reservasfluida.com.br'
   const appUrl = Deno.env.get('FLUIDA_APP_URL') || 'https://reservasfluida.vercel.app'
   const ok = (b: unknown) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } })
   if (!url || !secret || !resendKey) return ok({ ok: false, error: 'config' })
