@@ -28,7 +28,9 @@
   function isCustom(){ return branding().identity === 'custom'; }
 
   // Contas novas: o e-mail de voucher do servidor ainda usa o remetente e a imagem da RamonGuia.
-  window.fluidaVoucherEmailBlocked = function(){ return isCustom(); };
+  window.fluidaVoucherEmailBlocked = function(){ return false; };
+  // Contas novas enviam pelo envio por marca (remetente com o nome do guia e resposta para o e-mail dele).
+  window.fluidaVoucherFunction = function(){ return isCustom() ? 'send-voucher-guia' : 'send-booking-voucher'; };
 
   // Usado pelo voucher (abrir/visualizar). Contas novas não recebem as imagens da RamonGuia.
   window.fluidaVoucherBrand = function(){
@@ -37,7 +39,9 @@
     const fallbackBrand = custom ? '' : (g('voucherBrandImage') || '');
     return {
       welcomeImage: b.welcome_image || fallbackWelcome,
-      brandImage: b.logo || fallbackBrand
+      brandImage: b.logo || fallbackBrand,
+      layout: (b.voucher && typeof b.voucher === 'object') ? b.voucher : {},
+      primaryColor: HEX.test(b.primary_color || '') ? b.primary_color : ''
     };
   };
 
@@ -108,11 +112,55 @@
     });
   }
 
+  const VOUCHER_PARTS = [
+    ['qr', 'QR code do localizador'], ['client_email', 'E-mail do cliente'], ['welcome_image', 'Imagem de boas-vindas'],
+    ['included', 'Itens inclusos'], ['meeting', 'Horário e ponto de encontro'], ['payment', 'Valores e pagamentos'],
+    ['instructions', 'Informações para o cliente'], ['policy', 'Política de cancelamento'], ['review', 'Link de avaliação']
+  ];
+  function collectVoucher(section){
+    const out = {};
+    const txt = (id, max) => section.querySelector(id).value.trim().slice(0, max);
+    const sender = txt('#fb-sender', 60), reply = txt('#fb-reply', 254).toLowerCase();
+    const welcome = txt('#fb-welcome-text', 800), footer = txt('#fb-footer-text', 800);
+    if (sender) out.sender_name = sender;
+    if (reply) out.reply_to = reply;
+    if (welcome) out.welcome_text = welcome;
+    if (footer) out.footer_text = footer;
+    const bg = section.querySelector('#fb-header-bg').value;
+    if (HEX.test(bg) && bg.toLowerCase() !== '#e2ddc7') out.header_bg = bg;
+    const show = {};
+    for (const box of section.querySelectorAll('[data-voucher-part]')) if (!box.checked) show[box.dataset.voucherPart] = false;
+    if (Object.keys(show).length) out.show = show;
+    return out;
+  }
+  function previewVoucher(section){
+    const a = account();
+    if (typeof renderVoucherHTML !== 'function' || !a) return;
+    const today = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+    const sample = { id: 'exemplo', booking_code: 'EXEMPLO1', client_name: 'Maria Exemplo', client_email: 'maria@exemplo.com', client_phone: '+55 21 99999-9999',
+      tour_date: today, tour_time: '09:00', itinerary: 'Passeio de exemplo', pax: 2, total: 500, ticket_included: true, ticket_info: 'Ingresso de exemplo',
+      pickup_location: 'Hotel do cliente', client_message: 'Leve protetor solar e água.', payments: [{ amount: 200, voided: false }], voucher_options: { language: 'pt', transport: true } };
+    const base = window.fluidaVoucherBrand();
+    const primary = section.querySelector('#fb-primary').value;
+    const logoPrev = section.querySelector('#fb-logo-preview'), welcomePrev = section.querySelector('#fb-welcome-preview');
+    const settings = { ...base, layout: collectVoucher(section), primaryColor: HEX.test(primary) ? primary : base.primaryColor,
+      brandImage: logoPrev && logoPrev.style.display !== 'none' && logoPrev.src ? logoPrev.src : base.brandImage,
+      welcomeImage: welcomePrev && welcomePrev.style.display !== 'none' && welcomePrev.src ? welcomePrev.src : base.welcomeImage };
+    try {
+      const r = renderVoucherHTML(sample, a, [], settings);
+      const w = window.open('', '_blank');
+      if (!w) return notify('Permita abrir a janela do voucher no navegador.');
+      w.document.write(r.html); w.document.close();
+    } catch (e) { notify(e.message); }
+  }
+
   function injectSettings(){
     const dlg = document.getElementById('dlg');
     if (!dlg || !dlg.open || !dlg.querySelector('#a_nm') || dlg.querySelector('#fluida-brand-section')) return;
     if (member()?.role !== 'owner') return;
     const b = branding(), fin = (b.finance_labels && typeof b.finance_labels === 'object') ? b.finance_labels : {};
+    const v = (b.voucher && typeof b.voucher === 'object') ? b.voucher : {};
+    const showPart = k => !(v.show && v.show[k] === false);
     const section = document.createElement('section');
     section.id = 'fluida-brand-section';
     section.className = 'crm-details';
@@ -135,6 +183,23 @@
         <input id="fb-welcome" type="file" accept="image/png,image/jpeg,image/webp">
         ${b.welcome_image ? '<label style="display:flex;gap:6px;align-items:center"><input id="fb-welcome-remove" type="checkbox"> Remover imagem</label>' : ''}
       </div>
+      <h4 style="margin:18px 0 4px">E-mail do voucher</h4>
+      <p class="m">O voucher chega ao cliente com o nome abaixo como remetente. Quando o cliente responder, a resposta vai para o seu e-mail.</p>
+      <div class="row" style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px"><label for="fb-sender">Nome do remetente</label><input id="fb-sender" maxlength="60" value="${escape(v.sender_name || '')}" placeholder="${escape(account()?.name || 'Seu negócio')}"></div>
+        <div style="flex:1;min-width:220px"><label for="fb-reply">Seu e-mail (para receber as respostas)</label><input id="fb-reply" type="email" maxlength="254" value="${escape(v.reply_to || '')}" placeholder="voce@exemplo.com"></div>
+      </div>
+      <h4 style="margin:18px 0 4px">Como o voucher aparece</h4>
+      <label for="fb-welcome-text">Mensagem de boas-vindas (português)</label>
+      <textarea id="fb-welcome-text" rows="3" maxlength="800" placeholder="Com este voucher confirmamos sua reserva. Confira os detalhes e as informações importantes para sua experiência.">${escape(v.welcome_text || '')}</textarea>
+      <label for="fb-footer-text">Texto final (contato, WhatsApp, Instagram, recomendações…)</label>
+      <textarea id="fb-footer-text" rows="3" maxlength="800" placeholder="Ex.: Dúvidas? WhatsApp (21) 99999-9999 · @seuinstagram">${escape(v.footer_text || '')}</textarea>
+      <div><label for="fb-header-bg">Cor da faixa do logo</label><input id="fb-header-bg" type="color" value="${escape(HEX.test(v.header_bg || '') ? v.header_bg : '#e2ddc7')}"></div>
+      <p class="m" style="margin-bottom:4px">Informações que aparecem no voucher:</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 16px">
+        ${VOUCHER_PARTS.map(([k, label]) => `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" data-voucher-part="${k}" style="width:auto;min-height:0" ${showPart(k) ? 'checked' : ''}> ${escape(label)}</label>`).join('')}
+      </div>
+      <div class="acts"><button type="button" class="alt" id="fb-preview">Ver exemplo do voucher</button></div>
       <h4 style="margin:18px 0 4px">Nomes dos custos no Financeiro</h4>
       <p class="m">Troque os nomes das colunas de custo para o seu tipo de passeio. Deixe em branco para usar o padrão.</p>
       <div class="row" style="display:flex;gap:16px;flex-wrap:wrap">
@@ -151,6 +216,7 @@
     preview(section.querySelector('#fb-welcome'), section.querySelector('#fb-welcome-preview'));
     section.querySelector('#fb-reset').onclick = () => { section.querySelector('#fb-primary').value = DEFAULTS.primary; section.querySelector('#fb-accent').value = DEFAULTS.accent; };
     section.querySelector('#fb-save').onclick = () => saveBranding(section);
+    section.querySelector('#fb-preview').onclick = () => previewVoucher(section);
   }
 
   async function saveBranding(section){
@@ -169,6 +235,9 @@
       const primary = section.querySelector('#fb-primary').value, accent = section.querySelector('#fb-accent').value;
       if (primary.toLowerCase() === DEFAULTS.primary) delete next.primary_color; else if (HEX.test(primary)) next.primary_color = primary;
       if (accent.toLowerCase() === DEFAULTS.accent) delete next.accent_color; else if (HEX.test(accent)) next.accent_color = accent;
+      const voucher = collectVoucher(section);
+      if (voucher.reply_to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(voucher.reply_to)) throw new Error('Confira o seu e-mail para respostas.');
+      if (Object.keys(voucher).length) next.voucher = voucher; else delete next.voucher;
       const fin = {};
       for (const k of ['breakfast', 'ticket', 'guide']) { const v = section.querySelector('#fb-fin-' + k).value.trim().slice(0, 30); if (v) fin[k] = v; }
       if (Object.keys(fin).length) next.finance_labels = fin; else delete next.finance_labels;
