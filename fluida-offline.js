@@ -301,7 +301,7 @@ if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.registe
   return html;
  };
  const originalConfig=finConfig;
- finConfig=function(){const config=originalConfig();if(finData.settings?.config?.ticket_unit_cents==null){config.ticket_unit_cents=8900;if(!config.rule_versions?.length)config.rule_versions=[{from:'1900-01-01',config:{ticket_unit_cents:8700}},{from:'2026-11-01',config:{ticket_unit_cents:8900}}];}return config;};
+ finConfig=function(){const config=originalConfig();if(finData.settings?.config?.ticket_unit_cents==null&&!(typeof acc!=='undefined'&&acc?.branding?.identity==='custom')){config.ticket_unit_cents=8900;if(!config.rule_versions?.length)config.rule_versions=[{from:'1900-01-01',config:{ticket_unit_cents:8700}},{from:'2026-11-01',config:{ticket_unit_cents:8900}}];}return config;};
  function labelPoints(){
   for(const label of document.querySelectorAll('#c_custom_itinerary_field label,.schedule-custom-field label')){
    if(label.textContent!==pointsLabel)label.textContent=pointsLabel;

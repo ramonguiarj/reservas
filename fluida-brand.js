@@ -27,6 +27,9 @@
   function branding(){ const a = account(); return (a && a.branding && typeof a.branding === 'object') ? a.branding : {}; }
   function isCustom(){ return branding().identity === 'custom'; }
 
+  // Contas novas: o e-mail de voucher do servidor ainda usa o remetente e a imagem da RamonGuia.
+  window.fluidaVoucherEmailBlocked = function(){ return isCustom(); };
+
   // Usado pelo voucher (abrir/visualizar). Contas novas não recebem as imagens da RamonGuia.
   window.fluidaVoucherBrand = function(){
     const b = branding(), custom = b.identity === 'custom';
@@ -109,7 +112,7 @@
     const dlg = document.getElementById('dlg');
     if (!dlg || !dlg.open || !dlg.querySelector('#a_nm') || dlg.querySelector('#fluida-brand-section')) return;
     if (member()?.role !== 'owner') return;
-    const b = branding();
+    const b = branding(), fin = (b.finance_labels && typeof b.finance_labels === 'object') ? b.finance_labels : {};
     const section = document.createElement('section');
     section.id = 'fluida-brand-section';
     section.className = 'crm-details';
@@ -131,6 +134,13 @@
         <img id="fb-welcome-preview" alt="" style="width:120px;height:68px;object-fit:cover;border-radius:8px;${b.welcome_image ? '' : 'display:none'}" src="${escape(b.welcome_image || '')}">
         <input id="fb-welcome" type="file" accept="image/png,image/jpeg,image/webp">
         ${b.welcome_image ? '<label style="display:flex;gap:6px;align-items:center"><input id="fb-welcome-remove" type="checkbox"> Remover imagem</label>' : ''}
+      </div>
+      <h4 style="margin:18px 0 4px">Nomes dos custos no Financeiro</h4>
+      <p class="m">Troque os nomes das colunas de custo para o seu tipo de passeio. Deixe em branco para usar o padrão.</p>
+      <div class="row" style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><label for="fb-fin-breakfast">Coluna "${escape(window.fluidaFinLabel ? fluidaFinLabel('breakfast') : 'Café')}"</label><input id="fb-fin-breakfast" maxlength="30" value="${escape(fin.breakfast || '')}" placeholder="Ex.: Alimentação"></div>
+        <div><label for="fb-fin-ticket">Coluna "${escape(window.fluidaFinLabel ? fluidaFinLabel('ticket') : 'Cristo')}"</label><input id="fb-fin-ticket" maxlength="30" value="${escape(fin.ticket || '')}" placeholder="Ex.: Ingressos"></div>
+        <div><label for="fb-fin-guide">Coluna "${escape(window.fluidaFinLabel ? fluidaFinLabel('guide') : 'Outro guia')}"</label><input id="fb-fin-guide" maxlength="30" value="${escape(fin.guide || '')}" placeholder="Ex.: Guia parceiro"></div>
       </div>
       <p id="fb-msg" class="m" role="status"></p>
       <div class="acts"><button type="button" id="fb-save">Salvar personalização</button><button type="button" class="alt" id="fb-reset">Voltar às cores padrão</button></div>`;
@@ -159,6 +169,9 @@
       const primary = section.querySelector('#fb-primary').value, accent = section.querySelector('#fb-accent').value;
       if (primary.toLowerCase() === DEFAULTS.primary) delete next.primary_color; else if (HEX.test(primary)) next.primary_color = primary;
       if (accent.toLowerCase() === DEFAULTS.accent) delete next.accent_color; else if (HEX.test(accent)) next.accent_color = accent;
+      const fin = {};
+      for (const k of ['breakfast', 'ticket', 'guide']) { const v = section.querySelector('#fb-fin-' + k).value.trim().slice(0, 30); if (v) fin[k] = v; }
+      if (Object.keys(fin).length) next.finance_labels = fin; else delete next.finance_labels;
       const r = await d.from('accounts').update({ branding: next }).eq('id', a.id).select('branding').single();
       if (r.error) throw new Error(r.error.message);
       a.branding = r.data.branding;

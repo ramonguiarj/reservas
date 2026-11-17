@@ -1,4 +1,4 @@
--- PROPOSTA (NÃO APLICADA) — ajuste de permissões dentro de uma mesma conta.
+-- APLICADO em 17/11/2026 (migração fluida_ajuste_permissoes). Para desfazer: desfazer-ajuste-permissoes.sql
 -- Não apaga nem altera nenhuma reserva, pagamento, cliente ou valor: só remove regras antigas
 -- que ficaram duplicadas e hoje deixam colaboradores fazerem mais do que o nível de acesso permite.
 -- O isolamento ENTRE contas (um guia não vê outro) já está correto e não muda.
