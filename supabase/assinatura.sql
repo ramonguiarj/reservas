@@ -8,3 +8,9 @@
 -- * fluida_billing_private.events + apply_payment: cada pagamento aprovado do Mercado Pago soma 1 mês (+3 dias), uma vez só.
 -- * fluida_admin_set_billing: isentar, +7 dias grátis ou voltar a cobrar (só administração).
 -- Função de servidor: supabase/functions/fluida-billing (cartão recorrente, Pix e notificações).
+-- Migração fluida_assinatura_fases (17/11/2026):
+-- * fluida_account_expiry / fluida_account_phase: active | readonly (até 7 dias após vencer) | blocked.
+-- * Políticas RESTRITIVAS fluida_bill_* em todas as tabelas da conta: gravar só com conta ativa;
+--   ler bloqueado quando a fase é 'blocked' (accounts e members continuam legíveis para o aviso).
+-- * storage.objects (fluida-documents, booking-tickets): mesmas regras pela pasta da conta.
+-- * Aviso de exclusão: vencimento + 23 dias (dia 30 para quem nunca pagou). Exclusão NÃO é automática.

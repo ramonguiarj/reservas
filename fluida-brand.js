@@ -217,7 +217,7 @@
       sub.className = 'crm-details'; sub.id = 'fluida-billing-section';
       const a = account();
       sub.innerHTML = `<h3>Assinatura</h3>
-        <p>${bs.kind === 'paid' ? 'Em dia até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : bs.kind === 'trial' ? 'Teste grátis até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : '<b style="color:#a4332b">Conta em modo somente leitura</b>'}
+        <p>${bs.kind === 'paid' ? 'Em dia até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : bs.kind === 'trial' ? 'Teste grátis até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : '<b style="color:#a4332b">Conta em modo só visualização — bloqueio em ' + new Date(bs.blockAt).toLocaleDateString('pt-BR') + '</b>'}
         ${a?.mp_preapproval_id && a?.billing_status === 'active' ? ' · renovação automática no cartão' : ''}</p>
         <div class="acts"><button type="button" id="fb-subscribe">${bs.kind === 'paid' ? 'Pagar mais um mês (Pix)' : 'Assinar (R$ ' + PRICE + '/mês)'}</button>
         ${a?.mp_preapproval_id && a?.billing_status === 'active' ? '<button type="button" class="alt" id="fb-cancel-card">Cancelar renovação no cartão</button>' : ''}</div>
@@ -298,7 +298,9 @@
     if (x.billing_status === 'exempt') return '<span>Isenta</span>';
     if (x.paid_until && Date.parse(x.paid_until) > Date.now()) return `<span style="color:#205c38">Paga até ${fmtDate(x.paid_until)}</span>`;
     if (x.trial_ends_at && Date.parse(x.trial_ends_at) > Date.now()) return `<span style="color:#705008">Teste até ${fmtDate(x.trial_ends_at)}</span>`;
-    return '<b style="color:#a4332b">Bloqueada (só leitura)</b>';
+    const exp = Math.max(x.trial_ends_at ? Date.parse(x.trial_ends_at) : 0, x.paid_until ? Date.parse(x.paid_until) : 0);
+    if (Date.now() < exp + 7 * 864e5) return `<b style="color:#a4332b">Só leitura</b><br><span class="m">bloqueia ${fmtDate(exp + 7 * 864e5)}</span>`;
+    return `<b style="color:#a4332b">Bloqueada</b><br><span class="m">exclusão ${fmtDate(exp + 23 * 864e5)}</span>`;
   }
   const fmtDate = v => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
   function inviteLink(email){ return `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`; }
@@ -379,7 +381,9 @@
     const now = Date.now(), trial = a.trial_ends_at ? Date.parse(a.trial_ends_at) : 0, paid = a.paid_until ? Date.parse(a.paid_until) : 0;
     if (paid > now) return { kind: 'paid', until: paid, status: a.billing_status };
     if (trial > now) return { kind: 'trial', until: trial, days: Math.max(1, Math.ceil((trial - now) / 864e5)) };
-    return { kind: 'blocked', status: a.billing_status };
+    const expiry = Math.max(trial, paid), blockAt = expiry + 7 * 864e5, deleteAt = expiry + 23 * 864e5;
+    if (now < blockAt) return { kind: 'readonly', blockAt, deleteAt, status: a.billing_status };
+    return { kind: 'blocked', blockAt, deleteAt, status: a.billing_status };
   }
   window.fluidaBillingState = billingState;
   function applyBillingBanner(){
@@ -387,20 +391,43 @@
     if (!app || !header) return;
     const s = billingState(), owner = member()?.role === 'owner';
     let el = document.getElementById('fluida-billing-banner');
-    const show = s.kind === 'trial' || s.kind === 'blocked';
+    applyBlockScreen(s, owner);
+    const show = s.kind === 'trial' || s.kind === 'readonly';
     if (!show) { if (el) { el.remove(); document.body.style.paddingBottom = ''; } return; }
     const key = s.kind + (s.days || '') + owner;
     if (el && el.dataset.key === key) return;
     if (!el) { el = document.createElement('div'); el.id = 'fluida-billing-banner'; header.insertAdjacentElement('afterend', el); }
     el.dataset.key = key;
-    const blocked = s.kind === 'blocked';
+    const blocked = s.kind === 'readonly';
+    const day = v => new Date(v).toLocaleDateString('pt-BR');
     el.setAttribute('role', 'status');
     el.style.cssText = `position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:15px;box-shadow:0 -4px 16px #17323420;${blocked ? 'background:#fceceb;color:#942d27' : 'background:#fff5d9;color:#705008'}`;
     document.body.style.paddingBottom = '76px';
     el.innerHTML = blocked
-      ? `<b>Sua conta está em modo somente leitura.</b><span>Você continua vendo e exportando tudo, mas para criar ou editar reservas é preciso assinar (R$ ${PRICE}/mês).</span>${owner ? '<button type="button" data-subscribe style="background:#942d27;color:#fff">Assinar agora</button>' : '<span>Peça ao responsável da conta para assinar.</span>'}`
+      ? `<b>Conta em modo só visualização.</b><span>Para criar ou editar é preciso assinar (R$ ${PRICE}/mês). Em <b>${day(s.blockAt)}</b> o acesso será bloqueado.</span>${owner ? '<button type="button" data-subscribe style="background:#942d27;color:#fff">Assinar agora</button>' : '<span>Peça ao responsável da conta para assinar.</span>'}`
       : `<span>Teste grátis: <b>${s.days === 1 ? 'último dia' : 'faltam ' + s.days + ' dias'}</b>. Depois, R$ ${PRICE}/mês no cartão ou Pix.</span>${owner ? '<button type="button" class="alt" data-subscribe>Assinar</button>' : ''}`;
     const b = el.querySelector('[data-subscribe]'); if (b) b.onclick = openSubscribe;
+  }
+
+
+  function applyBlockScreen(s, owner){
+    let el = document.getElementById('fluida-block-screen');
+    if (s.kind !== 'blocked') { if (el) el.remove(); return; }
+    if (el) return;
+    const day = v => new Date(v).toLocaleDateString('pt-BR');
+    el = document.createElement('div');
+    el.id = 'fluida-block-screen';
+    el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true');
+    el.style.cssText = 'position:fixed;inset:0;z-index:60;background:#f4f5efee;display:flex;align-items:center;justify-content:center;padding:20px';
+    el.innerHTML = `<div style="max-width:520px;background:#fff;border:1px solid #d7dfd7;border-radius:16px;padding:28px;box-shadow:0 10px 40px #17323422">
+      <h2 style="margin-top:0;color:#942d27">Acesso bloqueado</h2>
+      <p>O período de teste ou a última mensalidade venceu e a conta foi bloqueada.</p>
+      <p style="background:#fceceb;color:#942d27;padding:12px 14px;border-radius:10px"><b>Atenção:</b> se não houver pagamento, a conta e todos os dados (reservas, clientes e financeiro) serão <b>excluídos em ${day(s.deleteAt)}</b>.</p>
+      <p>${owner ? 'Assine agora para recuperar o acesso na hora, com todos os dados como estavam.' : 'Peça ao responsável da conta para regularizar a assinatura.'}</p>
+      <div class="acts" style="display:flex;gap:10px;flex-wrap:wrap">${owner ? `<button type="button" data-unblock style="background:#942d27;color:#fff">Assinar (R$ ${PRICE}/mês)</button>` : ''}<button type="button" class="alt" data-logout>Sair</button></div></div>`;
+    document.body.appendChild(el);
+    const b = el.querySelector('[data-unblock]'); if (b) b.onclick = openSubscribe;
+    el.querySelector('[data-logout]').onclick = () => { try { logout(); } catch (e) { location.reload(); } };
   }
 
   function billingCall(payload){
@@ -494,6 +521,7 @@
       safe(applyBillingBanner);
       safe(handleCheckoutReturn);
     }
+    if (!a) { const bs = document.getElementById('fluida-block-screen'), bb = document.getElementById('fluida-billing-banner'); if (bs) bs.remove(); if (bb) { bb.remove(); document.body.style.paddingBottom = ''; } }
     safe(applyLogin);
     safe(injectSettings);
   }
