@@ -264,9 +264,50 @@
       <input id="pa-email" type="email" autocomplete="off" placeholder="guia@exemplo.com">
       <p id="pa-msg" class="m" role="status"></p>
       <div id="pa-result"></div>
-      <div class="acts"><button type="button" id="pa-send">Criar convite</button></div>`;
+      <div class="acts"><button type="button" id="pa-send">Criar convite</button></div>
+      <h3 style="margin-top:28px">Convites pendentes</h3>
+      <div id="pa-invites"><p class="m">Carregando…</p></div>
+      <h3 style="margin-top:28px">Guias cadastrados</h3>
+      <div id="pa-accounts"><p class="m">Carregando…</p></div>`;
     dlg.querySelector('#pa-send').onclick = sendBusinessInvite;
     dlg.showModal();
+    loadAdminOverview();
+  }
+
+  const fmtDate = v => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
+  function inviteLink(email){ return `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`; }
+  async function loadAdminOverview(){
+    const dlg = document.getElementById('dlg');
+    const boxA = dlg && dlg.querySelector('#pa-accounts'), boxI = dlg && dlg.querySelector('#pa-invites');
+    if (!boxA || !boxI) return;
+    try {
+      const r = await client().rpc('fluida_admin_overview');
+      if (r.error) throw new Error(r.error.message);
+      const accounts = r.data?.accounts || [], invites = r.data?.invites || [];
+      boxI.innerHTML = invites.length ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">E-mail</th><th style="text-align:left">Validade</th><th></th></tr></thead><tbody>
+        ${invites.map(i => `<tr style="border-top:1px solid #dde4db"><td>${escape(i.business_name)}</td><td>${escape(i.email)}</td>
+          <td>${i.expired ? '<b style="color:#a4332b">Vencido</b>' : 'até ' + fmtDate(i.expires_at)}</td>
+          <td style="text-align:right"><button type="button" class="alt" data-copy-invite="${escape(i.email)}" data-name="${escape(i.business_name)}">${i.expired ? 'Renovar' : 'Copiar link'}</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="m">Nenhum convite pendente.</p>';
+      boxI.querySelectorAll('[data-copy-invite]').forEach(btn => btn.onclick = async () => {
+        const email = btn.dataset.copyInvite, name = btn.dataset.name;
+        if (btn.textContent === 'Renovar') {
+          const rr = await client().rpc('fluida_invite_business', { p_email: email, p_business_name: name });
+          if (rr.error) return notify(rr.error.message);
+          await loadAdminOverview(); return;
+        }
+        try { await navigator.clipboard.writeText(inviteLink(email)); btn.textContent = 'Copiado ✓'; } catch (e) { notify(inviteLink(email)); }
+      });
+      boxA.innerHTML = accounts.length ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">Responsável</th><th>Equipe</th><th>Reservas</th><th style="text-align:left">Último acesso</th><th style="text-align:left">Desde</th></tr></thead><tbody>
+        ${accounts.map(x => `<tr style="border-top:1px solid #dde4db"><td>${escape(x.name)}${x.custom ? '' : ' <span class="m">(conta original)</span>'}</td><td>${escape(x.owner_email || '—')}</td>
+          <td style="text-align:center">${Number(x.members) || 0}</td><td style="text-align:center">${Number(x.bookings) || 0}</td>
+          <td>${fmtDate(x.last_sign_in_at)}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('')}
+        </tbody></table></div><p class="m">${accounts.length} conta(s). Por privacidade, aqui aparecem só números — as reservas e os clientes de cada guia continuam visíveis apenas para ele.</p>` : '<p class="m">Nenhuma conta.</p>';
+    } catch (e) {
+      boxA.innerHTML = boxI.innerHTML = `<p class="m">Não foi possível carregar: ${escape(e.message)}</p>`;
+    }
   }
 
   async function sendBusinessInvite(){
@@ -282,6 +323,7 @@
       const until = r.data?.expires_at ? new Date(r.data.expires_at).toLocaleDateString('pt-BR') : '';
       const text = `Olá! Sua conta no Fluida (${name}) está pronta para ser criada. Acesse ${link} e cadastre uma senha usando o e-mail ${email}.${until ? ' O convite vale até ' + until + '.' : ''}`;
       msg.textContent = 'Convite criado. Envie o link abaixo para o guia.';
+      loadAdminOverview();
       dlg.querySelector('#pa-result').innerHTML = `
         <label for="pa-link">Link de cadastro</label>
         <input id="pa-link" readonly value="${escape(link)}">
