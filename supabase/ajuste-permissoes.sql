@@ -23,3 +23,8 @@ drop policy if exists itineraries_update on public.itineraries;
 revoke update (id, primary_owner_user_id, created_at) on public.accounts from authenticated;
 
 commit;
+
+-- CORREÇÃO 17/11/2026 16:40 (migração fluida_restaura_permissoes_gravacao): as políticas removidas acima eram
+-- as únicas PERMISSIVAS de gravação em bookings/payments/itineraries (as v10/team_* são RESTRITIVAS).
+-- Sem elas nenhuma reserva/pagamento/roteiro podia ser salvo. Recriadas como "quem é da conta"
+-- (team_access_level não nulo); níveis, dono e assinatura seguem nas restritivas.
