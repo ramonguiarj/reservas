@@ -79,8 +79,51 @@
     applyHeader();
   }
 
+  function enhanceSignup(box){
+    const rules = box.querySelector('#password-rules'), pw = box.querySelector('#pw'), pw2 = box.querySelector('#pw_confirm');
+    if (!rules || !pw || rules.dataset.enhanced) return;
+    rules.dataset.enhanced = '1';
+    const h = box.querySelector('h2'); if (h) h.textContent = 'Criar sua conta';
+    const showBtn = [...box.querySelectorAll('button')].find(b => /Mostrar senha|Ocultar senha/.test(b.textContent));
+    const anchor = showBtn || pw;
+    const wrap = document.createElement('div');
+    wrap.id = 'fluida-pw-rules';
+    wrap.style.cssText = 'margin:10px 0 14px;padding:12px 14px;border:1px solid #d7dfd7;border-radius:12px;background:#fff';
+    wrap.innerHTML = '<b style="display:block;margin-bottom:6px">Sua senha precisa ter:</b>';
+    rules.style.cssText = 'list-style:none;margin:0;padding:0;line-height:1.9';
+    wrap.appendChild(rules);
+    wrap.insertAdjacentHTML('beforeend', '<p class="m" style="margin:8px 0 0">Exemplo de senha forte: <code>Passeio@2026</code></p>');
+    anchor.insertAdjacentElement('afterend', wrap);
+    const match = document.createElement('p'); match.id = 'fluida-pw-match'; match.className = 'm'; match.style.margin = '6px 0';
+    const confirmBtn = [...box.querySelectorAll('button')].find(b => /confirmação/i.test(b.textContent));
+    (confirmBtn || pw2 || pw).insertAdjacentElement('afterend', match);
+    const checks = v => ({ length: v.length >= 8, upper: /[A-Z]/.test(v), lower: /[a-z]/.test(v), number: /[0-9]/.test(v), special: /[^A-Za-z0-9\s]/.test(v) });
+    const labels = { length: 'Pelo menos 8 caracteres', upper: 'Uma letra MAIÚSCULA', lower: 'Uma letra minúscula', number: 'Um número (0-9)', special: 'Um caractere especial (ex.: ! @ # $ %)' };
+    const paint = () => {
+      const c = checks(pw.value);
+      for (const li of rules.querySelectorAll('[data-rule]')) {
+        const ok = !!c[li.dataset.rule];
+        li.innerHTML = `<span aria-hidden="true" style="display:inline-block;width:1.4em;font-weight:700;color:${ok ? '#205c38' : '#9aa7a2'}">${ok ? '✓' : '○'}</span>${escape(labels[li.dataset.rule] || li.textContent)}`;
+        li.style.color = ok ? '#205c38' : '#52665f'; li.style.fontWeight = ok ? '600' : '400';
+        li.setAttribute('aria-label', (labels[li.dataset.rule] || '') + (ok ? ' — cumprido' : ' — falta'));
+      }
+      if (pw2) {
+        if (!pw2.value) { match.textContent = ''; }
+        else if (pw2.value === pw.value) { match.innerHTML = '<span style="color:#205c38;font-weight:600">✓ As senhas são iguais</span>'; }
+        else { match.innerHTML = '<span style="color:#a4332b">As senhas ainda não são iguais</span>'; }
+      }
+    };
+    pw.addEventListener('input', paint); if (pw2) pw2.addEventListener('input', paint);
+    for (const b of box.querySelectorAll('button')) {
+      if (/Mostrar senha/.test(b.textContent)) b.textContent = '👁 Mostrar senha';
+      if (/Mostrar confirmação/.test(b.textContent)) b.textContent = '👁 Mostrar senha repetida';
+    }
+    paint();
+  }
+
   function applyLogin(){
     const box = document.getElementById('login');
+    if (box) safe(() => enhanceSignup(box));
     if (!box || box.dataset.fluidaBrand) return;
     box.dataset.fluidaBrand = '1';
     const params = new URLSearchParams(location.search);
