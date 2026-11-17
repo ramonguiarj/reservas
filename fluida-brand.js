@@ -211,6 +211,26 @@
       <div class="acts"><button type="button" id="fb-save">Salvar personalização</button><button type="button" class="alt" id="fb-reset">Voltar às cores padrão</button></div>`;
     const acts = dlg.querySelector('.acts');
     dlg.insertBefore(section, acts ? acts.nextSibling : null);
+    const bs = billingState();
+    if (bs.kind !== 'exempt') {
+      const sub = document.createElement('section');
+      sub.className = 'crm-details'; sub.id = 'fluida-billing-section';
+      const a = account();
+      sub.innerHTML = `<h3>Assinatura</h3>
+        <p>${bs.kind === 'paid' ? 'Em dia até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : bs.kind === 'trial' ? 'Teste grátis até <b>' + new Date(bs.until).toLocaleDateString('pt-BR') + '</b>' : '<b style="color:#a4332b">Conta em modo somente leitura</b>'}
+        ${a?.mp_preapproval_id && a?.billing_status === 'active' ? ' · renovação automática no cartão' : ''}</p>
+        <div class="acts"><button type="button" id="fb-subscribe">${bs.kind === 'paid' ? 'Pagar mais um mês (Pix)' : 'Assinar (R$ ' + PRICE + '/mês)'}</button>
+        ${a?.mp_preapproval_id && a?.billing_status === 'active' ? '<button type="button" class="alt" id="fb-cancel-card">Cancelar renovação no cartão</button>' : ''}</div>
+        <p id="fb-billing-msg" class="m" role="status"></p>`;
+      dlg.insertBefore(sub, section);
+      sub.querySelector('#fb-subscribe').onclick = openSubscribe;
+      const cancel = sub.querySelector('#fb-cancel-card');
+      if (cancel) cancel.onclick = async () => {
+        if (!confirm('Cancelar a renovação automática? Sua conta continua liberada até o fim do período já pago.')) return;
+        try { await billingCall({ action: 'cancel_card' }); await refreshAccount(); sub.querySelector('#fb-billing-msg').textContent = 'Renovação cancelada.'; }
+        catch (e) { sub.querySelector('#fb-billing-msg').textContent = e.message; }
+      };
+    }
     const preview = (input, img) => input.addEventListener('change', () => { const f = input.files[0]; if (f) { img.src = URL.createObjectURL(f); img.style.display = ''; } });
     preview(section.querySelector('#fb-logo'), section.querySelector('#fb-logo-preview'));
     preview(section.querySelector('#fb-welcome'), section.querySelector('#fb-welcome-preview'));
@@ -274,6 +294,12 @@
     loadAdminOverview();
   }
 
+  function billingLabel(x){
+    if (x.billing_status === 'exempt') return '<span>Isenta</span>';
+    if (x.paid_until && Date.parse(x.paid_until) > Date.now()) return `<span style="color:#205c38">Paga até ${fmtDate(x.paid_until)}</span>`;
+    if (x.trial_ends_at && Date.parse(x.trial_ends_at) > Date.now()) return `<span style="color:#705008">Teste até ${fmtDate(x.trial_ends_at)}</span>`;
+    return '<b style="color:#a4332b">Bloqueada (só leitura)</b>';
+  }
   const fmtDate = v => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
   function inviteLink(email){ return `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`; }
   async function loadAdminOverview(){
@@ -290,6 +316,12 @@
           <td>${i.expired ? '<b style="color:#a4332b">Vencido</b>' : 'até ' + fmtDate(i.expires_at)}</td>
           <td style="text-align:right"><button type="button" class="alt" data-copy-invite="${escape(i.email)}" data-name="${escape(i.business_name)}">${i.expired ? 'Renovar' : 'Copiar link'}</button></td></tr>`).join('')}
         </tbody></table></div>` : '<p class="m">Nenhum convite pendente.</p>';
+      boxA && setTimeout(() => boxA.querySelectorAll('[data-billing-action]').forEach(sel => sel.onchange = async () => {
+        const action = sel.value; if (!action) return;
+        const r = await client().rpc('fluida_admin_set_billing', { p_account: sel.dataset.billingAction, p_action: action, p_days: 7 });
+        if (r.error) notify(r.error.message);
+        loadAdminOverview();
+      }), 0);
       boxI.querySelectorAll('[data-copy-invite]').forEach(btn => btn.onclick = async () => {
         const email = btn.dataset.copyInvite, name = btn.dataset.name;
         if (btn.textContent === 'Renovar') {
@@ -300,10 +332,11 @@
         try { await navigator.clipboard.writeText(inviteLink(email)); btn.textContent = 'Copiado ✓'; } catch (e) { notify(inviteLink(email)); }
       });
       boxA.innerHTML = accounts.length ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
-        <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">Responsável</th><th>Equipe</th><th>Reservas</th><th style="text-align:left">Último acesso</th><th style="text-align:left">Desde</th></tr></thead><tbody>
+        <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">Responsável</th><th>Equipe</th><th>Reservas</th><th style="text-align:left">Último acesso</th><th style="text-align:left">Desde</th><th style="text-align:left">Assinatura</th><th></th></tr></thead><tbody>
         ${accounts.map(x => `<tr style="border-top:1px solid #dde4db"><td>${escape(x.name)}${x.custom ? '' : ' <span class="m">(conta original)</span>'}</td><td>${escape(x.owner_email || '—')}</td>
           <td style="text-align:center">${Number(x.members) || 0}</td><td style="text-align:center">${Number(x.bookings) || 0}</td>
-          <td>${fmtDate(x.last_sign_in_at)}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('')}
+          <td>${fmtDate(x.last_sign_in_at)}</td><td>${fmtDate(x.created_at)}</td><td>${billingLabel(x)}</td>
+          <td style="white-space:nowrap;text-align:right">${x.custom ? `<select data-billing-action="${escape(x.id)}" aria-label="Ação de assinatura"><option value="">Ações…</option><option value="extend">+7 dias grátis</option><option value="exempt">Isentar</option><option value="charge">Voltar a cobrar</option></select>` : ''}</td></tr>`).join('')}
         </tbody></table></div><p class="m">${accounts.length} conta(s). Por privacidade, aqui aparecem só números — as reservas e os clientes de cada guia continuam visíveis apenas para ele.</p>` : '<p class="m">Nenhuma conta.</p>';
     } catch (e) {
       boxA.innerHTML = boxI.innerHTML = `<p class="m">Não foi possível carregar: ${escape(e.message)}</p>`;
@@ -337,6 +370,120 @@
   }
 
   const safe = fn => { try { const r = fn(); if (r && r.catch) r.catch(e => console.warn('Fluida brand', e)); } catch (e) { console.warn('Fluida brand', e); } };
+
+  // ---------------- Assinatura (Mercado Pago) ----------------
+  const PRICE = 100;
+  function billingState(){
+    const a = account();
+    if (!a || !a.billing_status || a.billing_status === 'exempt') return { kind: 'exempt' };
+    const now = Date.now(), trial = a.trial_ends_at ? Date.parse(a.trial_ends_at) : 0, paid = a.paid_until ? Date.parse(a.paid_until) : 0;
+    if (paid > now) return { kind: 'paid', until: paid, status: a.billing_status };
+    if (trial > now) return { kind: 'trial', until: trial, days: Math.max(1, Math.ceil((trial - now) / 864e5)) };
+    return { kind: 'blocked', status: a.billing_status };
+  }
+  window.fluidaBillingState = billingState;
+  function applyBillingBanner(){
+    const app = document.getElementById('app'), header = document.querySelector('#app > header');
+    if (!app || !header) return;
+    const s = billingState(), owner = member()?.role === 'owner';
+    let el = document.getElementById('fluida-billing-banner');
+    const show = s.kind === 'trial' || s.kind === 'blocked';
+    if (!show) { if (el) { el.remove(); document.body.style.paddingBottom = ''; } return; }
+    const key = s.kind + (s.days || '') + owner;
+    if (el && el.dataset.key === key) return;
+    if (!el) { el = document.createElement('div'); el.id = 'fluida-billing-banner'; header.insertAdjacentElement('afterend', el); }
+    el.dataset.key = key;
+    const blocked = s.kind === 'blocked';
+    el.setAttribute('role', 'status');
+    el.style.cssText = `position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:15px;box-shadow:0 -4px 16px #17323420;${blocked ? 'background:#fceceb;color:#942d27' : 'background:#fff5d9;color:#705008'}`;
+    document.body.style.paddingBottom = '76px';
+    el.innerHTML = blocked
+      ? `<b>Sua conta está em modo somente leitura.</b><span>Você continua vendo e exportando tudo, mas para criar ou editar reservas é preciso assinar (R$ ${PRICE}/mês).</span>${owner ? '<button type="button" data-subscribe style="background:#942d27;color:#fff">Assinar agora</button>' : '<span>Peça ao responsável da conta para assinar.</span>'}`
+      : `<span>Teste grátis: <b>${s.days === 1 ? 'último dia' : 'faltam ' + s.days + ' dias'}</b>. Depois, R$ ${PRICE}/mês no cartão ou Pix.</span>${owner ? '<button type="button" class="alt" data-subscribe>Assinar</button>' : ''}`;
+    const b = el.querySelector('[data-subscribe]'); if (b) b.onclick = openSubscribe;
+  }
+
+  function billingCall(payload){
+    return client().functions.invoke('fluida-billing', { body: payload }).then(async r => {
+      let data = r.data;
+      if (r.error) { try { if (r.error.context?.json) data = await r.error.context.json(); } catch (e) {} }
+      if (r.error || !data?.ok) throw new Error(data?.error || 'Não foi possível concluir agora.');
+      return data;
+    });
+  }
+
+  let pixTimer = null;
+  function openSubscribe(){
+    const dlg = document.getElementById('dlg'); if (!dlg) return;
+    if (pixTimer) { clearInterval(pixTimer); pixTimer = null; }
+    const s = billingState(), email = member()?.email || '';
+    dlg.innerHTML = `
+      <form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form>
+      <h2 style="margin:0">Assinatura Fluida</h2>
+      <p style="font-size:18px;margin:8px 0"><b>R$ ${PRICE},00 por mês</b></p>
+      <p class="m">${s.kind === 'trial' ? 'Seu teste grátis continua valendo; o primeiro mês é cobrado a partir de agora.' : s.kind === 'paid' ? 'Sua assinatura está em dia até ' + new Date(s.until).toLocaleDateString('pt-BR') + '. Um novo pagamento soma mais um mês.' : 'Assine para voltar a criar e editar reservas. Nenhum dado foi apagado.'}</p>
+      <label for="sb-email">E-mail para o pagamento</label>
+      <input id="sb-email" type="email" value="${escape(email)}" autocomplete="email">
+      <p class="m">No cartão, use o mesmo e-mail da sua conta do Mercado Pago.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0">
+        <button type="button" id="sb-card" style="padding:16px;text-align:left;line-height:1.4"><b>Cartão de crédito</b><br><span style="font-weight:400">Renova sozinho todo mês. Cancele quando quiser.</span></button>
+        <button type="button" id="sb-pix" class="alt" style="padding:16px;text-align:left;line-height:1.4"><b>Pix</b><br><span style="font-weight:400">Pague 1 mês agora com QR Code ou copia e cola.</span></button>
+      </div>
+      <p id="sb-msg" class="m" role="status"></p>
+      <div id="sb-pix-box"></div>
+      <p class="m" style="margin-top:16px">Pagamento processado pelo Mercado Pago. O Fluida não vê nem guarda os dados do seu cartão.</p>`;
+    const msg = dlg.querySelector('#sb-msg'), mail = () => dlg.querySelector('#sb-email').value.trim();
+    dlg.querySelector('#sb-card').onclick = async () => {
+      msg.textContent = 'Abrindo o Mercado Pago…';
+      try { const d = await billingCall({ action: 'checkout_card', payer_email: mail() }); location.href = d.url; }
+      catch (e) { msg.textContent = e.message; }
+    };
+    dlg.querySelector('#sb-pix').onclick = async () => {
+      msg.textContent = 'Gerando o Pix…';
+      try {
+        const d = await billingCall({ action: 'pix', payer_email: mail() });
+        msg.textContent = 'Pague pelo app do seu banco. A liberação é automática assim que o Pix for confirmado.';
+        const box = dlg.querySelector('#sb-pix-box');
+        box.innerHTML = `<div style="text-align:center">${d.qr_code_base64 ? `<img alt="QR Code do Pix" src="data:image/png;base64,${escape(d.qr_code_base64)}" style="width:220px;height:220px">` : ''}</div>
+          <label for="sb-pix-code">Pix copia e cola</label><textarea id="sb-pix-code" rows="3" readonly>${escape(d.qr_code)}</textarea>
+          <div class="acts"><button type="button" class="alt" id="sb-copy">Copiar código</button></div>
+          <p class="m" id="sb-pix-status">Aguardando pagamento…</p>`;
+        box.querySelector('#sb-copy').onclick = async () => { try { await navigator.clipboard.writeText(d.qr_code); box.querySelector('#sb-copy').textContent = 'Copiado ✓'; } catch (e) {} };
+        let tries = 0;
+        pixTimer = setInterval(async () => {
+          if (!dlg.open || ++tries > 120) { clearInterval(pixTimer); pixTimer = null; return; }
+          try {
+            const c = await billingCall({ action: 'check_pix', payment_id: d.payment_id });
+            if (c.status === 'approved') {
+              clearInterval(pixTimer); pixTimer = null;
+              box.querySelector('#sb-pix-status').innerHTML = '<b style="color:#205c38">Pagamento confirmado! Conta liberada.</b>';
+              await refreshAccount();
+            }
+          } catch (e) {}
+        }, 5000);
+      } catch (e) { msg.textContent = e.message; }
+    };
+    if (!dlg.open) dlg.showModal();
+  }
+  window.fluidaOpenSubscribe = openSubscribe;
+
+  async function refreshAccount(){
+    const a = account(), d = client(); if (!a || !d) return;
+    const r = await d.from('accounts').select('billing_status,trial_ends_at,paid_until,mp_preapproval_id').eq('id', a.id).single();
+    if (!r.error && r.data) { Object.assign(a, r.data); const el = document.getElementById('fluida-billing-banner'); if (el) el.dataset.key = ''; applyAll(); }
+  }
+
+  let returnHandled = false;
+  function handleCheckoutReturn(){
+    if (returnHandled || !account()) return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('assinatura') !== 'retorno') return;
+    returnHandled = true;
+    params.delete('assinatura'); const u = new URL(location.href); u.search = params.toString(); history.replaceState(null, '', u);
+    notify('Recebemos o retorno do Mercado Pago. A liberação costuma levar poucos minutos; o app atualiza sozinho.');
+    let n = 0; const timer = setInterval(async () => { await refreshAccount(); if (billingState().kind === 'paid' || ++n > 24) clearInterval(timer); }, 10000);
+  }
+
   function applyAll(){
     const a = account();
     if (a) {
@@ -344,6 +491,8 @@
       if (appliedFor !== key) { appliedFor = key; safe(applyTheme); }
       safe(applyHeader);
       safe(checkPlatformAdmin);
+      safe(applyBillingBanner);
+      safe(handleCheckoutReturn);
     }
     safe(applyLogin);
     safe(injectSettings);

@@ -1,0 +1,10 @@
+-- Aplicado em 17/11/2026 (migrações fluida_assinatura_colunas, fluida_assinatura_somente_leitura,
+-- fluida_assinatura_eventos, fluida_admin_overview_assinatura):
+-- * accounts: billing_status (trial/pending/active/cancelled/exempt), trial_ends_at (padrão: 7 dias),
+--   paid_until, mp_preapproval_id, billing_email, billing_updated_at. Conta original = exempt.
+-- * Pelo app, authenticated só pode alterar name, cancel_policy, review_url, google_calendar_client_id, branding.
+-- * fluida_account_active(conta): isenta, em teste ou paga.
+-- * team_access_level: conta inativa vira 'visualizar' (somente leitura; nada é apagado).
+-- * fluida_billing_private.events + apply_payment: cada pagamento aprovado do Mercado Pago soma 1 mês (+3 dias), uma vez só.
+-- * fluida_admin_set_billing: isentar, +7 dias grátis ou voltar a cobrar (só administração).
+-- Função de servidor: supabase/functions/fluida-billing (cartão recorrente, Pix e notificações).
