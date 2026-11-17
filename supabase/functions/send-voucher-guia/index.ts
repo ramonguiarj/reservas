@@ -41,7 +41,7 @@ Deno.serve(async (request) => {
     const publishable = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}').default || Deno.env.get('SUPABASE_ANON_KEY')
     const secret = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}').default || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const resendKey = Deno.env.get('RESEND_API_KEY')
-    const fromRaw = Deno.env.get('FLUIDA_FROM_EMAIL') || Deno.env.get('RESEND_FROM_EMAIL') || ''
+    const fromRaw = Deno.env.get('FLUIDA_FROM_EMAIL') || 'reservas@envio.ramonguiarj.com.br' // domínio de envio dos guias (verificado no Resend)
     const fromAddress = senderAddress(fromRaw)
     if (!url || !publishable || !secret || !resendKey || !fromAddress) {
       return json({ error: 'O envio de e-mail não está configurado no servidor.', definitive: true }, 500)
