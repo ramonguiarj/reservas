@@ -606,6 +606,52 @@
     let n = 0; const timer = setInterval(async () => { await refreshAccount(); if (billingState().kind === 'paid' || ++n > 24) clearInterval(timer); }, 10000);
   }
 
+
+  // ---------------- Primeiros passos (contas de guias) ----------------
+  function onboardingSteps(){
+    const a = account() || {}, b = branding(), v = (b.voucher && typeof b.voucher === 'object') ? b.voucher : {};
+    let roteiros = 0; try { roteiros = (typeof itineraryCache !== 'undefined' && itineraryCache.length) || 0; } catch (e) {}
+    let reservas = 0; try { reservas = (typeof bookings !== 'undefined' && bookings.length) || 0; } catch (e) {}
+    return [
+      { done: !!b.logo, title: 'Coloque seu logo e suas cores', path: 'Menu → Configurações → Personalização da sua marca', go: 'settings', focus: '#fluida-brand-section' },
+      { done: !!String(a.cancel_policy || '').trim(), title: 'Escreva sua política de cancelamento', path: 'Menu → Configurações → Política de cancelamento', go: 'settings', focus: '#a_cp' },
+      { done: !!(v.reply_to || v.sender_name), title: 'Configure o e-mail do voucher', path: 'Menu → Configurações → E-mail do voucher', go: 'settings', focus: '#fb-sender' },
+      { done: roteiros > 0, title: 'Cadastre seus roteiros e valores', path: 'Menu → Roteiros', go: 'itineraries' },
+      { done: !!String(a.review_url || '').trim(), title: 'Adicione o link de avaliação (Google, TripAdvisor…)', path: 'Menu → Configurações → Link de avaliação', go: 'settings', focus: '#a_rv' },
+      { done: reservas > 0, title: 'Crie sua primeira reserva', path: 'Botão "Nova reserva" no topo', go: 'booking' },
+      { done: false, optional: true, title: 'Convide sua equipe (opcional)', path: 'Menu → Equipe', go: 'team' },
+    ];
+  }
+  async function onboardingGo(step){
+    try {
+      if (step.go === 'settings') { await openAccountSettings(); setTimeout(() => { const el = document.querySelector(step.focus); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); try { el.focus({ preventScroll: true }); } catch (e) {} } }, 450); }
+      else if (step.go === 'itineraries') openItineraries();
+      else if (step.go === 'booking') openBooking();
+      else if (step.go === 'team') openConfig();
+    } catch (e) { notify('Abra pelo ' + step.path + '.'); }
+  }
+  function applyOnboarding(){
+    const a = account();
+    if (!a || !isCustom() || member()?.role !== 'owner') return;
+    const head = document.querySelector('#main-tab-panel .fd-heading, .fd-heading');
+    if (!head || document.getElementById('fluida-onboarding')) return;
+    const key = 'fluida-onboarding-hidden-' + a.id;
+    try { if (localStorage.getItem(key) === '1') return; } catch (e) {}
+    const steps = onboardingSteps(), required = steps.filter(s => !s.optional), done = required.filter(s => s.done).length;
+    if (done === required.length) return;
+    const box = document.createElement('section');
+    box.id = 'fluida-onboarding';
+    box.style.cssText = 'border:1px solid #d7dfd7;border-left:5px solid var(--g);border-radius:14px;background:#fff;padding:16px 18px;margin:0 0 18px';
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div><h2 style="margin:0">Primeiros passos</h2><p class="m" style="margin:2px 0 0">${done} de ${required.length} concluídos. Deixe sua conta pronta para receber clientes.</p></div><button type="button" class="alt" data-ob-hide>Ocultar</button></div>
+      <ol style="list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px">${steps.map((s, i) => `<li style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:${s.done ? '#f2fcf4' : '#f7f8f5'}">
+        <div style="display:flex;gap:10px;align-items:flex-start"><span aria-hidden="true" style="font-weight:700;color:${s.done ? '#205c38' : '#9aa7a2'};font-size:18px;line-height:1.2">${s.done ? '✓' : '○'}</span><div><b style="${s.done ? 'color:#205c38' : ''}">${escape(s.title)}</b><div class="m" style="font-size:13px">${escape(s.path)}</div></div></div>
+        ${s.done ? '<span class="m">Feito</span>' : `<button type="button" class="alt" data-ob-go="${i}">Abrir</button>`}</li>`).join('')}</ol>`;
+    head.insertAdjacentElement('afterend', box);
+    box.querySelector('[data-ob-hide]').onclick = () => { try { localStorage.setItem(key, '1'); } catch (e) {} box.remove(); };
+    box.querySelectorAll('[data-ob-go]').forEach(btn => btn.onclick = () => onboardingGo(steps[Number(btn.dataset.obGo)]));
+  }
+  window.fluidaShowOnboarding = function(){ const a = account(); if (a) { try { localStorage.removeItem('fluida-onboarding-hidden-' + a.id); } catch (e) {} } const el = document.getElementById('fluida-onboarding'); if (el) el.remove(); applyOnboarding(); };
+
   function applyAll(){
     const a = account();
     if (a) {
@@ -614,6 +660,7 @@
       safe(applyHeader);
       safe(checkPlatformAdmin);
       safe(applyBillingBanner);
+      safe(applyOnboarding);
       safe(handleCheckoutReturn);
     }
     if (!a) { const bs = document.getElementById('fluida-block-screen'), bb = document.getElementById('fluida-billing-banner'); if (bs) bs.remove(); if (bb) { bb.remove(); document.body.style.paddingBottom = ''; } }
