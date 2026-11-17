@@ -295,12 +295,38 @@
   }
 
   function billingLabel(x){
-    if (x.billing_status === 'exempt') return '<span>Isenta</span>';
+    if (x.billing_status === 'exempt' || !x.custom) return '<span>Isenta</span>';
     if (x.paid_until && Date.parse(x.paid_until) > Date.now()) return `<span style="color:#205c38">Paga até ${fmtDate(x.paid_until)}</span>`;
     if (x.trial_ends_at && Date.parse(x.trial_ends_at) > Date.now()) return `<span style="color:#705008">Teste até ${fmtDate(x.trial_ends_at)}</span>`;
     const exp = Math.max(x.trial_ends_at ? Date.parse(x.trial_ends_at) : 0, x.paid_until ? Date.parse(x.paid_until) : 0);
     if (Date.now() < exp + 7 * 864e5) return `<b style="color:#a4332b">Só leitura</b><br><span class="m">bloqueia ${fmtDate(exp + 7 * 864e5)}</span>`;
     return `<b style="color:#a4332b">Bloqueada</b><br><span class="m">exclusão ${fmtDate(exp + 23 * 864e5)}</span>`;
+  }
+  function confirmDeleteAccount(id, name){
+    const dlg = document.getElementById('dlg'); if (!dlg) return;
+    const back = dlg.innerHTML;
+    dlg.innerHTML = `<h2 style="margin-top:0;color:#942d27">Excluir conta definitivamente</h2>
+      <p>Você vai apagar <b>${escape(name)}</b>: reservas, pagamentos, clientes, financeiro, arquivos, equipe e o login do guia.</p>
+      <p style="background:#fceceb;color:#942d27;padding:12px;border-radius:10px"><b>Não dá para desfazer.</b> Sugestão: antes, confirme com o guia que ele não vai pagar.</p>
+      <label for="del-name">Para confirmar, digite o nome do negócio: <b>${escape(name)}</b></label>
+      <input id="del-name" autocomplete="off">
+      <p id="del-msg" class="m" role="status"></p>
+      <div class="acts"><button type="button" id="del-go" style="background:#942d27;color:#fff" disabled>Excluir para sempre</button><button type="button" class="alt" id="del-back">Voltar</button></div>`;
+    const input = dlg.querySelector('#del-name'), go = dlg.querySelector('#del-go'), msg = dlg.querySelector('#del-msg');
+    input.oninput = () => { go.disabled = input.value.trim() !== String(name).trim(); };
+    dlg.querySelector('#del-back').onclick = () => openPlatformAdmin();
+    go.onclick = async () => {
+      go.disabled = true; msg.textContent = 'Excluindo…';
+      try {
+        const r = await client().functions.invoke('fluida-admin-account', { body: { action: 'delete', account_id: id, confirm_name: input.value.trim() } });
+        let data = r.data; if (r.error) { try { if (r.error.context?.json) data = await r.error.context.json(); } catch (e) {} }
+        if (r.error || !data?.ok) throw new Error(data?.error || 'Não foi possível excluir.');
+        msg.textContent = `Conta excluída (${data.bookings || 0} reservas, ${data.customers || 0} clientes, ${data.files || 0} arquivos).`;
+        setTimeout(() => openPlatformAdmin(), 1800);
+      } catch (e) { msg.textContent = e.message; go.disabled = false; }
+    };
+    if (!dlg.open) dlg.showModal();
+    void back;
   }
   const fmtDate = v => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
   function inviteLink(email){ return `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`; }
@@ -324,6 +350,9 @@
         if (r.error) notify(r.error.message);
         loadAdminOverview();
       }), 0);
+      setTimeout(() => boxA.querySelectorAll('[data-delete-account]').forEach(btn => btn.onclick = () => confirmDeleteAccount(btn.dataset.deleteAccount, btn.dataset.name)), 0);
+      const deleted = r.data?.deleted || [];
+      if (deleted.length) setTimeout(() => boxA.insertAdjacentHTML('beforeend', `<details style="margin-top:10px"><summary class="m">Contas excluídas (${deleted.length})</summary><ul class="m">${deleted.map(d => `<li>${escape(d.name)} · ${escape(d.owner_email || '')} · ${fmtDate(d.deleted_at)}</li>`).join('')}</ul></details>`), 0);
       boxI.querySelectorAll('[data-copy-invite]').forEach(btn => btn.onclick = async () => {
         const email = btn.dataset.copyInvite, name = btn.dataset.name;
         if (btn.textContent === 'Renovar') {
@@ -338,7 +367,7 @@
         ${accounts.map(x => `<tr style="border-top:1px solid #dde4db"><td>${escape(x.name)}${x.custom ? '' : ' <span class="m">(conta original)</span>'}</td><td>${escape(x.owner_email || '—')}</td>
           <td style="text-align:center">${Number(x.members) || 0}</td><td style="text-align:center">${Number(x.bookings) || 0}</td>
           <td>${fmtDate(x.last_sign_in_at)}</td><td>${fmtDate(x.created_at)}</td><td>${billingLabel(x)}</td>
-          <td style="white-space:nowrap;text-align:right">${x.custom ? `<select data-billing-action="${escape(x.id)}" aria-label="Ação de assinatura"><option value="">Ações…</option><option value="extend">+7 dias grátis</option><option value="exempt">Isentar</option><option value="charge">Voltar a cobrar</option></select>` : ''}</td></tr>`).join('')}
+          <td style="white-space:nowrap;text-align:right">${x.deletable ? `<button type="button" data-delete-account="${escape(x.id)}" data-name="${escape(x.name)}" style="background:#942d27;color:#fff;margin-right:6px">Excluir conta</button>` : ''}${x.custom ? `<select data-billing-action="${escape(x.id)}" aria-label="Ação de assinatura"><option value="">Ações…</option><option value="extend">+7 dias grátis</option><option value="exempt">Isentar</option><option value="charge">Voltar a cobrar</option></select>` : ''}</td></tr>`).join('')}
         </tbody></table></div><p class="m">${accounts.length} conta(s). Por privacidade, aqui aparecem só números — as reservas e os clientes de cada guia continuam visíveis apenas para ele.</p>` : '<p class="m">Nenhuma conta.</p>';
     } catch (e) {
       boxA.innerHTML = boxI.innerHTML = `<p class="m">Não foi possível carregar: ${escape(e.message)}</p>`;

@@ -14,3 +14,7 @@
 --   ler bloqueado quando a fase é 'blocked' (accounts e members continuam legíveis para o aviso).
 -- * storage.objects (fluida-documents, booking-tickets): mesmas regras pela pasta da conta.
 -- * Aviso de exclusão: vencimento + 23 dias (dia 30 para quem nunca pagou). Exclusão NÃO é automática.
+-- Migração fluida_exclusao_de_conta (17/11/2026): exclusão definitiva só pela Administração (função
+-- fluida-admin-account), só para contas de guias bloqueadas com a data de exclusão alcançada
+-- (vencimento + 23 dias), com nome digitado para confirmar. Apaga arquivos, registros e o login do guia;
+-- fica registrada em fluida_tenant_private.deleted_accounts. A conta original nunca é elegível.
