@@ -1,3 +1,4 @@
 -- Aplicado em 17/11/2026 (migração fluida_admin_overview): função somente leitura para a
 -- Administração Fluida listar contas (só contagens) e convites de negócio pendentes.
 -- Restrita a fluida_tenant_private.platform_admins; sem acesso para anon.
+-- Migração fluida_admin_editar_apagar_convite (17/11/2026): fluida_admin_update_invite / fluida_admin_delete_invite (só admin, só convites não usados).

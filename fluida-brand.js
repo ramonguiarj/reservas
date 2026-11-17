@@ -342,7 +342,9 @@
         <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">E-mail</th><th style="text-align:left">Validade</th><th></th></tr></thead><tbody>
         ${invites.map(i => `<tr style="border-top:1px solid #dde4db"><td>${escape(i.business_name)}</td><td>${escape(i.email)}</td>
           <td>${i.expired ? '<b style="color:#a4332b">Vencido</b>' : 'até ' + fmtDate(i.expires_at)}</td>
-          <td style="text-align:right"><button type="button" class="alt" data-copy-invite="${escape(i.email)}" data-name="${escape(i.business_name)}">${i.expired ? 'Renovar' : 'Copiar link'}</button></td></tr>`).join('')}
+          <td style="text-align:right;white-space:nowrap"><button type="button" class="alt" data-copy-invite="${escape(i.email)}" data-name="${escape(i.business_name)}">${i.expired ? 'Renovar' : 'Copiar link'}</button>
+            <button type="button" class="alt" data-edit-invite="${escape(i.email)}" data-name="${escape(i.business_name)}">Editar</button>
+            <button type="button" class="alt" data-del-invite="${escape(i.email)}" style="color:#942d27">Apagar</button></td></tr>`).join('')}
         </tbody></table></div>` : '<p class="m">Nenhum convite pendente.</p>';
       boxA && setTimeout(() => boxA.querySelectorAll('[data-billing-action]').forEach(sel => sel.onchange = async () => {
         const action = sel.value; if (!action) return;
@@ -353,6 +355,27 @@
       setTimeout(() => boxA.querySelectorAll('[data-delete-account]').forEach(btn => btn.onclick = () => confirmDeleteAccount(btn.dataset.deleteAccount, btn.dataset.name)), 0);
       const deleted = r.data?.deleted || [];
       if (deleted.length) setTimeout(() => boxA.insertAdjacentHTML('beforeend', `<details style="margin-top:10px"><summary class="m">Contas excluídas (${deleted.length})</summary><ul class="m">${deleted.map(d => `<li>${escape(d.name)} · ${escape(d.owner_email || '')} · ${fmtDate(d.deleted_at)}</li>`).join('')}</ul></details>`), 0);
+      boxI.querySelectorAll('[data-del-invite]').forEach(btn => btn.onclick = async () => {
+        if (!confirm(`Apagar o convite de ${btn.dataset.delInvite}? O link enviado deixa de funcionar.`)) return;
+        const rr = await client().rpc('fluida_admin_delete_invite', { p_email: btn.dataset.delInvite });
+        if (rr.error) return notify(rr.error.message);
+        loadAdminOverview();
+      });
+      boxI.querySelectorAll('[data-edit-invite]').forEach(btn => btn.onclick = () => {
+        const tr = btn.closest('tr'), oldEmail = btn.dataset.editInvite;
+        tr.innerHTML = `<td><input data-ed-name maxlength="120" value="${escape(btn.dataset.name)}" aria-label="Nome do negócio"></td>
+          <td><input data-ed-email type="email" value="${escape(oldEmail)}" aria-label="E-mail do guia"></td>
+          <td colspan="2" style="white-space:nowrap;text-align:right"><button type="button" data-ed-save>Salvar</button> <button type="button" class="alt" data-ed-cancel>Cancelar</button><div class="m" data-ed-msg></div></td>`;
+        tr.querySelector('[data-ed-cancel]').onclick = () => loadAdminOverview();
+        tr.querySelector('[data-ed-save]').onclick = async () => {
+          const nm = tr.querySelector('[data-ed-name]').value.trim(), em = tr.querySelector('[data-ed-email]').value.trim().toLowerCase();
+          const rr = await client().rpc('fluida_admin_update_invite', { p_old_email: oldEmail, p_new_email: em, p_business_name: nm });
+          if (rr.error) { tr.querySelector('[data-ed-msg]').textContent = rr.error.message; return; }
+          await loadAdminOverview();
+          const msg = document.getElementById('pa-msg');
+          if (msg) msg.textContent = em !== oldEmail ? `Convite corrigido para ${em}. Envie o novo link (botão Copiar link); o link antigo não funciona mais.` : 'Convite atualizado e renovado por 7 dias.';
+        };
+      });
       boxI.querySelectorAll('[data-copy-invite]').forEach(btn => btn.onclick = async () => {
         const email = btn.dataset.copyInvite, name = btn.dataset.name;
         if (btn.textContent === 'Renovar') {
