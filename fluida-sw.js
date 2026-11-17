@@ -1,6 +1,6 @@
 'use strict';
-const CACHE='fluida-shell-20261101-roteiro-89';
-const SHELL=['/','/offline-core.js','/fluida-offline.js','/gmail-cloud-panel.js','/privacidade.html','/manifest.webmanifest'];
+const CACHE='fluida-shell-20261117-multiguias';
+const SHELL=['/','/offline-core.js','/fluida-offline.js','/gmail-cloud-panel.js','/fluida-brand.js','/privacidade.html','/manifest.webmanifest'];
 const SDK='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(CACHE);
