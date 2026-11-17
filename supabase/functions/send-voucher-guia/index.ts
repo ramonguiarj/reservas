@@ -26,6 +26,14 @@ function senderAddress(raw: string) {
   const address = (inside ? inside[1] : raw).trim()
   return EMAIL.test(address) ? address : ''
 }
+const SEND_DOMAIN = 'reservasfluida.com.br'
+const RESERVED = ['admin','administrador','suporte','fluida','reservasfluida','financeiro','cobranca','postmaster','abuse','noreply','no-reply','contato','equipe']
+function localPart(chosen: unknown, name: string) {
+  const c = String(chosen || '').trim().toLowerCase()
+  if (/^[a-z0-9](?:[a-z0-9.-]{1,38})[a-z0-9]$/.test(c) && !/[.-]{2}/.test(c) && !RESERVED.includes(c)) return c
+  const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 40)
+  return slug.length >= 3 && !RESERVED.includes(slug) ? slug : 'reservas'
+}
 function displayName(value: string) {
   return value.replace(/["<>\r\n\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Reservas'
 }
@@ -124,20 +132,30 @@ Deno.serve(async (request) => {
       { path: rendered.qrUrl, filename: 'localizador-qr.png', content_id: 'booking-qr', content_type: 'image/png' },
     ]
 
+    const brandedFrom = `${localPart(voucher.sender_local, name)}@${SEND_DOMAIN}`
+    const send = (from: string, key: string) => fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}`, 'Idempotency-Key': key },
+      body: JSON.stringify({
+        from: `"${name}" <${from}>`,
+        to: [to],
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        subject: rendered.subject,
+        html: rendered.html,
+        attachments,
+      }),
+    })
     let response: Response
     try {
-      response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}`, 'Idempotency-Key': `voucher-${requestId}` },
-        body: JSON.stringify({
-          from: `"${name}" <${fromAddress}>`,
-          to: [to],
-          ...(replyTo ? { reply_to: replyTo } : {}),
-          subject: rendered.subject,
-          html: rendered.html,
-          attachments,
-        }),
-      })
+      response = await send(brandedFrom, `voucher-${requestId}`)
+      // Enquanto o domínio novo não estiver verificado no Resend, usa o endereço antigo.
+      if (response.status === 403 || response.status === 422) {
+        const body = await response.clone().json().catch(() => ({}))
+        if (/domain|verif/i.test(String(body?.message || ''))) {
+          console.warn('Domínio de envio ainda não verificado; usando o endereço anterior')
+          response = await send(fromAddress, `voucher-${requestId}-anterior`)
+        }
+      }
     } catch {
       await admin.rpc('finish_voucher_email_send', { p_request_id: requestId, p_lease_token: lease, p_status: 'uncertain', p_error_code: 'network' })
       return json({ error: 'Sem confirmação do serviço de e-mail. Tente novamente para retomar o mesmo envio, sem duplicar.' }, 502)

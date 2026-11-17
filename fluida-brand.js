@@ -160,12 +160,18 @@
     ['included', 'Itens inclusos'], ['meeting', 'Horário e ponto de encontro'], ['payment', 'Valores e pagamentos'],
     ['instructions', 'Informações para o cliente'], ['policy', 'Política de cancelamento'], ['review', 'Link de avaliação']
   ];
+  const SEND_DOMAIN = 'reservasfluida.com.br';
+  const RESERVED = ['admin','administrador','suporte','fluida','reservasfluida','financeiro','cobranca','postmaster','abuse','noreply','no-reply','contato','equipe'];
+  const LOCAL_OK = s => /^[a-z0-9](?:[a-z0-9.-]{1,38})[a-z0-9]$/.test(s) && !/[.-]{2}/.test(s) && !RESERVED.includes(s);
+  const slugLocal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 40);
   function collectVoucher(section){
     const out = {};
     const txt = (id, max) => section.querySelector(id).value.trim().slice(0, max);
     const sender = txt('#fb-sender', 60), reply = txt('#fb-reply', 254).toLowerCase();
     const welcome = txt('#fb-welcome-text', 800), footer = txt('#fb-footer-text', 800);
     if (sender) out.sender_name = sender;
+    const local = txt('#fb-local', 40).toLowerCase();
+    if (local) { if (!LOCAL_OK(local)) throw new Error('Confira o endereço de envio: use só letras, números, ponto ou hífen (3 a 40 caracteres).'); out.sender_local = local; }
     if (reply) out.reply_to = reply;
     if (welcome) out.welcome_text = welcome;
     if (footer) out.footer_text = footer;
@@ -227,11 +233,14 @@
         ${b.welcome_image ? '<label style="display:flex;gap:6px;align-items:center"><input id="fb-welcome-remove" type="checkbox"> Remover imagem</label>' : ''}
       </div>
       <h4 style="margin:18px 0 4px">E-mail do voucher</h4>
-      <p class="m">O voucher chega ao cliente com o nome abaixo como remetente. Quando o cliente responder, a resposta vai para o seu e-mail.</p>
+      <p class="m">O voucher chega ao cliente com o seu nome e o seu endereço de envio. Quando o cliente responder, a resposta vai para o seu e-mail.</p>
       <div class="row" style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:220px"><label for="fb-sender">Nome do remetente</label><input id="fb-sender" maxlength="60" value="${escape(v.sender_name || '')}" placeholder="${escape(account()?.name || 'Seu negócio')}"></div>
         <div style="flex:1;min-width:220px"><label for="fb-reply">Seu e-mail (para receber as respostas)</label><input id="fb-reply" type="email" maxlength="254" value="${escape(v.reply_to || '')}" placeholder="voce@exemplo.com"></div>
       </div>
+      <label for="fb-local">Endereço de envio</label>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><input id="fb-local" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px;max-width:280px" value="${escape(v.sender_local || '')}" placeholder="${escape(slugLocal(v.sender_name || account()?.name) || 'seunome')}"><b>@${SEND_DOMAIN}</b></div>
+      <p class="m" style="font-size:13px">O cliente vê: <b id="fb-local-preview"></b>. Use só letras, números, ponto ou hífen. Se deixar em branco, usamos o seu nome.</p>
       <h4 style="margin:18px 0 4px">Como o voucher aparece</h4>
       <label for="fb-welcome-text">Mensagem de boas-vindas (português)</label>
       <textarea id="fb-welcome-text" rows="3" maxlength="800" placeholder="Com este voucher confirmamos sua reserva. Confira os detalhes e as informações importantes para sua experiência.">${escape(v.welcome_text || '')}</textarea>
@@ -277,6 +286,10 @@
     const preview = (input, img) => input.addEventListener('change', () => { const f = input.files[0]; if (f) { img.src = URL.createObjectURL(f); img.style.display = ''; } });
     preview(section.querySelector('#fb-logo'), section.querySelector('#fb-logo-preview'));
     preview(section.querySelector('#fb-welcome'), section.querySelector('#fb-welcome-preview'));
+    const localIn = section.querySelector('#fb-local'), localOut = section.querySelector('#fb-local-preview'), senderIn = section.querySelector('#fb-sender');
+    const updLocal = () => { const raw = localIn.value.trim().toLowerCase(), fallback = slugLocal(senderIn.value || account()?.name) || 'reservas'; localIn.placeholder = fallback; const loc = raw || fallback; localOut.textContent = `${senderIn.value.trim() || account()?.name || ''} <${loc}@${SEND_DOMAIN}>`; localOut.style.color = raw && !LOCAL_OK(raw) ? '#9e2424' : ''; };
+    localIn.addEventListener('input', () => { localIn.value = localIn.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''); updLocal(); });
+    senderIn.addEventListener('input', updLocal); updLocal();
     section.querySelector('#fb-reset').onclick = () => { section.querySelector('#fb-primary').value = DEFAULTS.primary; section.querySelector('#fb-accent').value = DEFAULTS.accent; };
     section.querySelector('#fb-save').onclick = () => saveBranding(section);
     section.querySelector('#fb-preview').onclick = () => previewVoucher(section);
