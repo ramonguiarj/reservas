@@ -1,0 +1,7 @@
+-- Migração fluida_lembrete_vespera (18/11/2026)
+-- fluida_reminder_private.log (booking_id, tour_date) — 1 lembrete por reserva e data.
+-- public.fluida_tour_reminders_claim(): reservas de amanhã (Brasília), não canceladas, com e-mail, criadas há 6h+,
+--   conta ativa; contas de guias: ligado salvo branding.voucher.reminder=false; conta original: só se reminder=true.
+-- public.fluida_tour_reminders_done(...). Ambas só service_role.
+-- Cron "fluida-tour-reminder": 2,32 20-21 * * * (17h–18h30 de Brasília) chama a função fluida-tour-reminder.
+-- Correção 18/11: embed de pagamentos com FK explícita (payments!payments_booking_id_fkey) — havia duas FKs.

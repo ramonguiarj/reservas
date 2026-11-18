@@ -178,6 +178,7 @@
     if (local) { if (!LOCAL_OK(local)) throw new Error('Confira o endereço de envio: use só letras, números, ponto ou hífen (3 a 40 caracteres).'); out.sender_local = local; }
     if (reply) out.reply_to = reply;
     const pix = txt('#fb-pix', 140); if (pix) out.pix_key = pix;
+    const rem = section.querySelector('#fb-reminder'); if (rem) out.reminder = rem.checked;
     if (welcome) out.welcome_text = welcome;
     if (footer) out.footer_text = footer;
     const bg = section.querySelector('#fb-header-bg').value;
@@ -246,6 +247,8 @@
       <label for="fb-local">Endereço de envio</label>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><input id="fb-local" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px;max-width:280px" value="${escape(v.sender_local || '')}" placeholder="${escape(slugLocal(v.sender_name || account()?.name) || 'seunome')}"><b>@${SEND_DOMAIN}</b></div>
       <p class="m" style="font-size:13px">O cliente vê: <b id="fb-local-preview"></b>. Use só letras, números, ponto ou hífen. Se deixar em branco, usamos o seu nome.</p>
+      <h4 style="margin:18px 0 4px">Lembrete na véspera</h4>
+      <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input id="fb-reminder" type="checkbox" style="width:auto;margin-top:4px" ${(isCustom() ? v.reminder !== false : v.reminder === true) ? 'checked' : ''}> <span>Enviar automaticamente ao cliente, às 17h do dia anterior ao passeio, um e-mail "Seu passeio é amanhã" com horário, ponto de encontro e o voucher. Só para reservas com e-mail do cliente.</span></label>
       <h4 style="margin:18px 0 4px">Cobrança pelo WhatsApp</h4>
       <p class="m">Nas reservas com saldo em aberto aparece o botão <b>Cobrar no WhatsApp</b>, com a mensagem pronta no idioma do cliente. Se quiser, a mensagem já leva a sua chave Pix.</p>
       <label for="fb-pix">Sua chave Pix (opcional)</label>

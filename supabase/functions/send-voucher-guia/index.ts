@@ -71,7 +71,7 @@ Deno.serve(async (request) => {
     if (!UUID.test(bookingId) || !UUID.test(requestId)) return json({ error: 'Solicitação inválida.', definitive: true }, 400)
 
     // Leitura com as permissões do próprio usuário (RLS): só acessa reservas da conta dele.
-    const { data: booking, error: bookingError } = await userDb.from('bookings').select('*, payments(*)').eq('id', bookingId).single()
+    const { data: booking, error: bookingError } = await userDb.from('bookings').select('*, payments!payments_booking_id_fkey(*)').eq('id', bookingId).single()
     if (bookingError || !booking) return json({ error: 'Reserva não encontrada ou sem acesso.', definitive: true }, 404)
     const { data: account, error: accountError } = await userDb.from('accounts').select('*').eq('id', booking.account_id).single()
     if (accountError || !account) return json({ error: 'Dados da conta não encontrados.', definitive: true }, 404)
