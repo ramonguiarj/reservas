@@ -5150,7 +5150,7 @@ function finExport(){
 }
 
 // Versão 8: vendas e operação. Valores monetários agregados em centavos.
-const LEAD_SOURCES={nao_informada:'Não informada',trafego_pago:'Tráfego pago',indicacao:'Indicação',instagram:'Instagram',outro:'Outro'};
+const LEAD_SOURCES={nao_informada:'Não informada',trafego_pago:'Tráfego pago',indicacao:'Indicação',instagram:'Instagram',pesquisa:'Pesquisa (Google etc.)',outro:'Outro'};
 let salesYear=String(Number(crmToday().slice(0,4))),salesMonth='',salesSource='todos';
 let operationalEmails=[],operationalEmailError='';
 const businessDate=value=>{if(!value)return '';const d=new Date(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(d):'';};

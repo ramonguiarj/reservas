@@ -8,3 +8,5 @@
 -- Funções: fluida-booking-pay (Pix do sinal + webhook + avisos ao guia) e fluida-mp-connect (OAuth; segredos MP_CLIENT_ID e MP_CLIENT_SECRET).
 -- fluida_link_dados_cliente (18/11/2026): o cliente também informa a data de aniversário; país/estado vêm do DDI/DDD do WhatsApp
 --   (calculados na página) e o idioma da página vira o idioma do voucher. Grava em client_birthday, client_country, client_state.
+-- fluida_link_origem_venda (18/11/2026): aniversário e "como nos conheceu" obrigatórios no link; grava voucher_options.lead_source
+--   (trafego_pago, instagram, indicacao, pesquisa, outro) e lead_detail. Nova origem "pesquisa" também no formulário do app.
