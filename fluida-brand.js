@@ -128,6 +128,11 @@
   function applyLogin(){
     const box = document.getElementById('login');
     if (box) safe(() => enhanceSignup(box));
+    if (box && !box.querySelector('#password-rules') && !box.querySelector('#fluida-conheca')) {
+      const p = document.createElement('p'); p.id = 'fluida-conheca'; p.className = 'm'; p.style.cssText = 'margin:18px 0 0;text-align:center;font-size:15px';
+      p.innerHTML = 'Ainda não usa o Fluida? <a href="/conheca" style="font-weight:700">Conheça e teste grátis por 7 dias</a>';
+      box.appendChild(p);
+    }
     if (!box || box.dataset.fluidaBrand) return;
     box.dataset.fluidaBrand = '1';
     const params = new URLSearchParams(location.search);
@@ -354,6 +359,8 @@
       <p id="pa-msg" class="m" role="status"></p>
       <div id="pa-result"></div>
       <div class="acts"><button type="button" id="pa-send">Criar convite</button></div>
+      <h3 style="margin-top:28px">Pedidos de teste <span class="m" style="font-weight:400;font-size:14px">(vindos de reservasfluida.com.br/conheca)</span></h3>
+      <div id="pa-leads"><p class="m">Carregando…</p></div>
       <h3 style="margin-top:28px">Convites pendentes</h3>
       <div id="pa-invites"><p class="m">Carregando…</p></div>
       <h3 style="margin-top:28px">Guias cadastrados</h3>
@@ -361,6 +368,7 @@
     dlg.querySelector('#pa-send').onclick = sendBusinessInvite;
     dlg.showModal();
     loadAdminOverview();
+    loadLeads();
   }
 
   function billingLabel(x){
@@ -399,6 +407,36 @@
   }
   const fmtDate = v => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
   function inviteLink(email){ return `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`; }
+
+  async function loadLeads(){
+    const dlg = document.getElementById('dlg'), box = dlg && dlg.querySelector('#pa-leads');
+    if (!box) return;
+    try {
+      const r = await client().rpc('fluida_admin_leads');
+      if (r.error) throw new Error(r.error.message);
+      const leads = (r.data || []).filter(l => !l.has_account);
+      if (!leads.length) { box.innerHTML = '<p class="m">Nenhum pedido novo.</p>'; return; }
+      box.innerHTML = leads.map(l => {
+        const wa = String(l.whatsapp || '').replace(/\D/g, '');
+        return `<div style="border:1px solid #dde4db;border-radius:12px;padding:12px 14px;margin:0 0 10px;background:#fff">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${escape(l.business_name)}</b><span class="m" style="font-size:13px">${fmtDate(l.created_at)}${l.invited ? ' · <b style="color:#205c38">convite criado</b>' : ''}</span></div>
+          <div class="m" style="font-size:14px">${escape(l.name)} · ${escape(l.email)}${l.whatsapp ? ' · ' + escape(l.whatsapp) : ''}${l.city ? ' · ' + escape(l.city) : ''}</div>
+          ${l.message ? `<p style="margin:6px 0 0;font-size:14px;white-space:pre-wrap">${escape(l.message)}</p>` : ''}
+          <div class="acts" style="margin-top:8px">${l.invited ? '' : `<button type="button" data-lead-invite="${l.id}">Criar convite</button>`}
+            ${wa ? `<a class="alt" style="display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px;border:1px solid #cfd9d1;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa.length <= 11 ? '55' : ''}${wa}?text=${encodeURIComponent('Olá, ' + String(l.name).split(' ')[0] + '! Aqui é o Ramon, do Fluida. Recebi seu pedido para testar o app.')}">WhatsApp</a>` : ''}
+            <button type="button" class="alt" data-lead-dismiss="${l.id}">Dispensar</button></div></div>`;
+      }).join('');
+      box.querySelectorAll('[data-lead-invite]').forEach(btn => btn.onclick = () => {
+        const l = leads.find(x => String(x.id) === btn.dataset.leadInvite); if (!l) return;
+        dlg.querySelector('#pa-name').value = l.business_name; dlg.querySelector('#pa-email').value = l.email;
+        dlg.querySelector('#pa-name').scrollIntoView({ block: 'center', behavior: 'smooth' });
+        sendBusinessInvite().then(() => loadLeads());
+      });
+      box.querySelectorAll('[data-lead-dismiss]').forEach(btn => btn.onclick = async () => {
+        btn.disabled = true; await client().rpc('fluida_admin_dismiss_lead', { p_id: Number(btn.dataset.leadDismiss) }); loadLeads();
+      });
+    } catch (e) { box.innerHTML = '<p class="m">Não foi possível carregar os pedidos.</p>'; }
+  }
   async function loadAdminOverview(){
     const dlg = document.getElementById('dlg');
     const boxA = dlg && dlg.querySelector('#pa-accounts'), boxI = dlg && dlg.querySelector('#pa-invites');
@@ -493,7 +531,10 @@
       const link = `${location.origin}/?convite=${encodeURIComponent(email)}&modo=cadastro`;
       const until = r.data?.expires_at ? new Date(r.data.expires_at).toLocaleDateString('pt-BR') : '';
       const text = `Olá! Sua conta no Fluida (${name}) está pronta para ser criada. Acesse ${link} e cadastre uma senha usando o e-mail ${email}.${until ? ' O convite vale até ' + until + '.' : ''}`;
-      msg.textContent = 'Convite criado. Envie o link abaixo para o guia.';
+      msg.textContent = 'Convite criado. Enviando o e-mail para o guia…';
+      client().functions.invoke('fluida-invite-email', { body: { email } }).then(res => {
+        msg.textContent = res.error || !res.data?.ok ? 'Convite criado, mas o e-mail não foi enviado. Envie o link abaixo pelo WhatsApp.' : `Convite criado e enviado por e-mail para ${email}. Se quiser, mande também pelo WhatsApp.`;
+      }).catch(() => { msg.textContent = 'Convite criado. Envie o link abaixo para o guia.'; });
       loadAdminOverview();
       dlg.querySelector('#pa-result').innerHTML = `
         <label for="pa-link">Link de cadastro</label>

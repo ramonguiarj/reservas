@@ -1,0 +1,5 @@
+-- Migrações fluida_pedidos_de_teste e fluida_convite_por_email (18/11/2026)
+-- fluida_tenant_private.leads: pedidos de teste vindos de /conheca (anon chama public.fluida_request_access; limite 2/e-mail/dia e 30/hora).
+-- admin_notifications ganhou kind 'lead' (e-mail para a administração).
+-- public.fluida_admin_leads() / fluida_admin_dismiss_lead(id): lista e dispensa, só administração.
+-- public.fluida_invite_lookup(email): só service_role; usada pela função fluida-invite-email, que envia o convite por e-mail.

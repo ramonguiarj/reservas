@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/conheca", "destination": "/conheca.html" },
+    { "source": "/guias", "destination": "/conheca.html" }
+  ]
+}

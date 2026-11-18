@@ -31,6 +31,18 @@ Deno.serve(async () => {
         `E-mail: ${esc(n.owner_email || n.payload?.email)}`,
         `Teste grátis até: <b>${day(n.trial_ends_at)}</b>`,
       ]
+    } else if (n.kind === 'lead') {
+      const q = n.payload || {}
+      subject = `Pedido de teste no Fluida: ${q.business_name || q.name || ''}`
+      const wa = String(q.whatsapp || '').replace(/\D/g, '')
+      lines = [
+        `<b>${esc(q.name)}</b> (${esc(q.business_name)}) quer testar o Fluida.`,
+        `E-mail: ${esc(q.email)}`,
+        q.whatsapp ? `WhatsApp: ${wa ? `<a href="https://wa.me/${wa.length <= 11 ? '55' : ''}${wa}">${esc(q.whatsapp)}</a>` : esc(q.whatsapp)}` : '',
+        q.city ? `Cidade: ${esc(q.city)}` : '',
+        q.message ? `Mensagem: ${esc(q.message)}` : '',
+        'Para liberar, abra a Administração Fluida → <b>Pedidos de teste</b> → <b>Criar convite</b>.',
+      ].filter(Boolean)
     } else {
       subject = `Pagamento recebido: ${n.account_name || ''} (${money(n.payload?.amount)})`
       lines = [
