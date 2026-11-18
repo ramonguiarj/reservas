@@ -94,6 +94,10 @@
     wrap.appendChild(rules);
     wrap.insertAdjacentHTML('beforeend', '<p class="m" style="margin:8px 0 0">Exemplo de senha forte: <code>Passeio@2026</code></p>');
     anchor.insertAdjacentElement('afterend', wrap);
+    const legal = document.createElement('p'); legal.className = 'm'; legal.style.cssText = 'margin:12px 0 0;font-size:14px';
+    legal.innerHTML = 'Ao criar a conta, você concorda com os <a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.';
+    const submit = [...box.querySelectorAll('button')].find(b => /criar|cadastr/i.test(b.textContent) && !/senha/i.test(b.textContent));
+    (submit || wrap).insertAdjacentElement(submit ? 'beforebegin' : 'afterend', legal);
     const match = document.createElement('p'); match.id = 'fluida-pw-match'; match.className = 'm'; match.style.margin = '6px 0';
     const confirmBtn = [...box.querySelectorAll('button')].find(b => /confirmação/i.test(b.textContent));
     (confirmBtn || pw2 || pw).insertAdjacentElement('afterend', match);
