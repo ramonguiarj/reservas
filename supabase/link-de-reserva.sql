@@ -1,0 +1,8 @@
+-- Migrações fluida_link_de_reserva e fluida_link_de_reserva_servidor (18/11/2026)
+-- fluida_links_private.links: link de reserva (hash do token), passeio definido pelo guia, total e sinal.
+--   status open → booked (cliente enviou os dados; reserva criada) → paid (sinal confirmado pelo Mercado Pago).
+-- fluida_links_private.mp_accounts: Mercado Pago do guia (OAuth). oauth_states: estados do OAuth.
+-- RPCs do app: fluida_create_booking_link, fluida_list_booking_links, fluida_cancel_booking_link, fluida_mp_status.
+-- RPCs públicas (página /reservar): fluida_booking_link_info, fluida_booking_link_submit, fluida_booking_link_claim_paid.
+-- RPCs só do servidor: fluida_link_by_hash/by_id/set/apply_payment, fluida_mp_state_create/take, fluida_mp_save/delete.
+-- Funções: fluida-booking-pay (Pix do sinal + webhook + avisos ao guia) e fluida-mp-connect (OAuth; segredos MP_CLIENT_ID e MP_CLIENT_SECRET).

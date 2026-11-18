@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Reserva</title>
+<meta name="theme-color" content="#07383a">
+<style>
+:root{--c:#07383a;--ink:#173234;--muted:#5b6f69;--line:#dbe4dc;--back:#f4f6f1}
+*{box-sizing:border-box}
+body{margin:0;background:var(--back);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+.brand{display:flex;align-items:center;gap:12px;margin:6px 0 16px}
+.brand img{width:56px;height:56px;border-radius:12px;object-fit:cover;background:#fff;border:1px solid var(--line)}
+.brand b{font-size:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin:0 0 14px}
+h1{font-size:22px;margin:0 0 4px;line-height:1.25}
+.m{color:var(--muted);font-size:14px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid #eef2ee}
+.row:first-of-type{border-top:0}
+.big{font-size:26px;font-weight:800;color:var(--c)}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}
+input,textarea{width:100%;font:inherit;padding:12px;border:1px solid #c8d4cb;border-radius:12px;background:#fff;color:var(--ink)}
+input:focus,textarea:focus{outline:3px solid rgba(7,56,58,.25);border-color:var(--c)}
+button{width:100%;min-height:50px;border:0;border-radius:14px;background:var(--c);color:#fff;font:inherit;font-weight:700;cursor:pointer;margin-top:14px}
+button.alt{background:#fff;color:var(--c);border:2px solid var(--c)}
+button[disabled]{opacity:.6}
+.err{color:#9e2424;font-weight:600;min-height:22px;margin:8px 0 0}
+.ok{background:#eaf6ee;border-color:#bfe2c8}
+.qr{display:flex;justify-content:center;margin:10px 0}
+.qr img,.qr svg{width:220px;height:220px}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;background:#f2f5f2;border-radius:10px;padding:10px}
+details summary{cursor:pointer;font-weight:600}
+.foot{text-align:center;font-size:12px;color:var(--muted);margin-top:24px}
+.foot a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main id="app"><p class="m">Carregando…</p></main>
+<script src="/vendor/qrcode.js"></script>
+<script>
+(function(){
+  var SB = 'https://ewhfabhktkvrjddnvgkl.supabase.co', KEY = 'sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU';
+  var lang = (navigator.language || 'pt').slice(0, 2); if (['pt','en','es'].indexOf(lang) < 0) lang = 'en';
+  var T = {
+    pt: { tour:'Seu passeio', date:'Data', time:'Horário', people:'Pessoas', total:'Valor total', deposit:'Sinal para confirmar', rest:'Restante (no dia ou combinado com o guia)', policy:'Política de cancelamento', you:'Seus dados', name:'Nome completo', phone:'WhatsApp (com DDD ou código do país)', email:'E-mail', doc:'CPF ou passaporte (opcional)', hotel:'Hotel ou endereço de busca (opcional)', notes:'Observações (opcional)', next:'Continuar para o pagamento', req:'Preencha nome, WhatsApp e um e-mail válido.', pay:'Pague o sinal no Pix', payMp:'Abra o app do seu banco, escolha Pix e leia o QR code ou use o código copia e cola. A confirmação é automática.', payKey:'Abra o app do seu banco, escolha Pix e leia o QR code ou use o código copia e cola.', copy:'Copiar código Pix', copied:'Código copiado', paid:'Já paguei', waiting:'Aguardando o pagamento…', done:'Reserva confirmada!', doneMp:'Recebemos o seu sinal. Você vai receber a confirmação por e-mail.', claimed:'Obrigado! O guia vai conferir o Pix e confirmar sua reserva.', noPay:'Recebemos seus dados. O guia vai combinar o pagamento do sinal com você pelo WhatsApp.', expired:'Este link expirou ou não está mais disponível. Fale com o guia para receber um novo.', notFound:'Link não encontrado.', code:'Localizador', key:'Chave Pix' },
+    en: { tour:'Your tour', date:'Date', time:'Time', people:'Guests', total:'Total price', deposit:'Deposit to confirm', rest:'Balance (on the day or as agreed)', policy:'Cancellation policy', you:'Your details', name:'Full name', phone:'WhatsApp (with country code)', email:'Email', doc:'Passport or ID (optional)', hotel:'Hotel or pickup address (optional)', notes:'Notes (optional)', next:'Continue to payment', req:'Please fill in your name, WhatsApp and a valid email.', pay:'Pay the deposit with Pix', payMp:'Open your banking app, choose Pix and scan the QR code or paste the code. Confirmation is automatic.', payKey:'Open your banking app, choose Pix and scan the QR code or paste the code.', copy:'Copy Pix code', copied:'Code copied', paid:'I have paid', waiting:'Waiting for payment…', done:'Booking confirmed!', doneMp:'We received your deposit. You will get a confirmation by email.', claimed:'Thank you! Your guide will check the payment and confirm your booking.', noPay:'We received your details. Your guide will arrange the deposit payment with you on WhatsApp.', expired:'This link has expired or is no longer available. Please ask your guide for a new one.', notFound:'Link not found.', code:'Booking reference', key:'Pix key' },
+    es: { tour:'Tu paseo', date:'Fecha', time:'Horario', people:'Personas', total:'Valor total', deposit:'Seña para confirmar', rest:'Saldo (el día del paseo o como se acuerde)', policy:'Política de cancelación', you:'Tus datos', name:'Nombre completo', phone:'WhatsApp (con código de país)', email:'Correo electrónico', doc:'Pasaporte o documento (opcional)', hotel:'Hotel o dirección de recogida (opcional)', notes:'Observaciones (opcional)', next:'Continuar al pago', req:'Completa nombre, WhatsApp y un correo válido.', pay:'Paga la seña con Pix', payMp:'Abre la app de tu banco, elige Pix y escanea el código QR o usa el código copia y pega. La confirmación es automática.', payKey:'Abre la app de tu banco, elige Pix y escanea el código QR o usa el código copia y pega.', copy:'Copiar código Pix', copied:'Código copiado', paid:'Ya pagué', waiting:'Esperando el pago…', done:'¡Reserva confirmada!', doneMp:'Recibimos tu seña. Recibirás la confirmación por correo.', claimed:'¡Gracias! El guía verificará el pago y confirmará tu reserva.', noPay:'Recibimos tus datos. El guía acordará contigo el pago de la seña por WhatsApp.', expired:'Este enlace venció o ya no está disponible. Pide uno nuevo a tu guía.', notFound:'Enlace no encontrado.', code:'Código de reserva', key:'Clave Pix' }
+  }[lang];
+  document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang;
+  var app = document.getElementById('app');
+  var esc = function(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var money = function(v){ return Number(v || 0).toLocaleString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es' : 'en-US', { style:'currency', currency:'BRL' }); };
+  var dfmt = function(d){ if (!d) return ''; var p = String(d).split('-'); return lang === 'en' ? p[1] + '/' + p[2] + '/' + p[0] : p[2] + '/' + p[1] + '/' + p[0]; };
+  var token = new URLSearchParams(location.search).get('t') || '';
+  var hash = '', info = null;
+  function rpc(fn, args){
+    return fetch(SB + '/rest/v1/rpc/' + fn, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:KEY, Authorization:'Bearer ' + KEY }, body: JSON.stringify(args) })
+      .then(function(r){ return r.json().then(function(d){ if (!r.ok) throw new Error((d && d.message) || 'Erro'); return d; }); });
+  }
+  function fn(body){
+    return fetch(SB + '/functions/v1/fluida-booking-pay', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:KEY, Authorization:'Bearer ' + KEY }, body: JSON.stringify(body) })
+      .then(function(r){ return r.json().then(function(d){ if (!r.ok) throw new Error((d && d.error) || 'Erro'); return d; }); });
+  }
+  function sha256(s){ return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function(b){ return Array.prototype.map.call(new Uint8Array(b), function(x){ return ('0' + x.toString(16)).slice(-2); }).join(''); }); }
+
+  // Pix estático (BR Code) com valor, para a chave do guia
+  function ascii(s, n){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 .\-]/g, '').toUpperCase().trim().slice(0, n) || 'X'; }
+  function tlv(id, v){ return id + ('0' + v.length).slice(-2) + v; }
+  function crc16(s){ var c = 0xFFFF; for (var i = 0; i < s.length; i++) { c ^= s.charCodeAt(i) << 8; for (var j = 0; j < 8; j++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; } return ('000' + c.toString(16).toUpperCase()).slice(-4); }
+  function pixKey(k){ k = String(k || '').trim(); if (k.indexOf('@') > 0) return k.toLowerCase(); if (/^\+/.test(k)) return '+' + k.replace(/\D/g, ''); var d = k.replace(/[.\-\/\s]/g, ''); if (/^\d{11}$|^\d{14}$/.test(d)) return d; return k; }
+  function brcode(key, amount, name, city, txid){
+    var mai = tlv('00', 'br.gov.bcb.pix') + tlv('01', pixKey(key));
+    var p = tlv('00', '01') + tlv('26', mai) + tlv('52', '0000') + tlv('53', '986') + tlv('54', Number(amount).toFixed(2)) + tlv('58', 'BR') + tlv('59', ascii(name, 25)) + tlv('60', ascii(city, 15)) + tlv('62', tlv('05', (String(txid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 25)) || '***')) + '6304';
+    return p + crc16(p);
+  }
+  function qrSvg(text){ var q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); }
+
+  function header(){
+    return '<div class="brand">' + (info.logo ? '<img src="' + esc(info.logo) + '" alt="">' : '') + '<b>' + esc(info.business) + '</b></div>' +
+      '<section class="card"><div class="m">' + T.tour + '</div><h1>' + esc(info.itinerary) + '</h1>' +
+      '<div class="row"><span>' + T.date + '</span><b>' + dfmt(info.tour_date) + '</b></div>' +
+      (info.tour_time ? '<div class="row"><span>' + T.time + '</span><b>' + esc(String(info.tour_time).slice(0, 5)) + '</b></div>' : '') +
+      '<div class="row"><span>' + T.people + '</span><b>' + esc(info.pax) + '</b></div>' +
+      '<div class="row"><span>' + T.total + '</span><b>' + money(info.total) + '</b></div>' +
+      '<div class="row"><span>' + T.deposit + '</span><span class="big">' + money(info.deposit) + '</span></div>' +
+      '<div class="row m"><span>' + T.rest + '</span><span>' + money(Number(info.total) - Number(info.deposit)) + '</span></div>' +
+      (info.message ? '<p style="white-space:pre-wrap;margin:10px 0 0">' + esc(info.message) + '</p>' : '') +
+      (info.cancel_policy ? '<details style="margin-top:10px"><summary>' + T.policy + '</summary><p class="m" style="white-space:pre-wrap">' + esc(info.cancel_policy) + '</p></details>' : '') +
+      '</section>';
+  }
+  function foot(){ return '<p class="foot">Fluida · <a href="/privacidade.html">Privacidade</a></p>'; }
+
+  function renderForm(){
+    app.innerHTML = header() + '<form class="card" id="f" novalidate><h1 style="font-size:19px">' + T.you + '</h1>' +
+      '<label for="n">' + T.name + '</label><input id="n" autocomplete="name" maxlength="120">' +
+      '<label for="p">' + T.phone + '</label><input id="p" type="tel" autocomplete="tel" maxlength="40">' +
+      '<label for="e">' + T.email + '</label><input id="e" type="email" autocomplete="email" maxlength="200">' +
+      '<label for="d">' + T.doc + '</label><input id="d" maxlength="60">' +
+      '<label for="h">' + T.hotel + '</label><input id="h" maxlength="300" value="' + esc(info.pickup || '') + '">' +
+      '<label for="o">' + T.notes + '</label><textarea id="o" rows="2" maxlength="800"></textarea>' +
+      '<button type="submit" id="go">' + T.next + '</button><p class="err" id="er" role="alert"></p></form>' + foot();
+    var v = function(id){ return document.getElementById(id).value.trim(); };
+    document.getElementById('f').onsubmit = function(ev){
+      ev.preventDefault(); var er = document.getElementById('er'), go = document.getElementById('go'); er.textContent = '';
+      if (!v('n') || !v('p') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('e'))) { er.textContent = T.req; return; }
+      go.disabled = true;
+      rpc('fluida_booking_link_submit', { p_hash: hash, p_client: { name: v('n'), phone: v('p'), email: v('e'), document: v('d'), pickup: v('h'), notes: v('o') } })
+        .then(function(){ return load(); })
+        .catch(function(e){ er.textContent = e.message; go.disabled = false; });
+    };
+  }
+
+  var poll = null;
+  function renderPay(){
+    if (info.pay_mode === 'none') { app.innerHTML = header() + '<section class="card ok"><h1>' + T.done + '</h1><p>' + T.noPay + '</p>' + (info.booking_code ? '<p class="m">' + T.code + ': ' + esc(info.booking_code) + '</p>' : '') + '</section>' + foot(); return; }
+    if (info.pay_mode === 'key' && info.claimed) { app.innerHTML = header() + '<section class="card ok"><h1>' + T.done + '</h1><p>' + T.claimed + '</p>' + (info.booking_code ? '<p class="m">' + T.code + ': ' + esc(info.booking_code) + '</p>' : '') + '</section>' + foot(); return; }
+    app.innerHTML = header() + '<section class="card"><h1 style="font-size:19px">' + T.pay + ' · ' + money(info.deposit) + '</h1><p class="m">' + (info.pay_mode === 'mp' ? T.payMp : T.payKey) + '</p><div id="px"><p class="m">' + T.waiting + '</p></div><p class="err" id="er" role="alert"></p></section>' + foot();
+    var px = document.getElementById('px'), er = document.getElementById('er');
+    function show(code, imgB64){
+      px.innerHTML = '<div class="qr">' + (imgB64 ? '<img alt="QR code Pix" src="data:image/png;base64,' + imgB64 + '">' : qrSvg(code)) + '</div><div class="code" id="cc">' + esc(code) + '</div>' +
+        '<button type="button" id="cp">' + T.copy + '</button>' +
+        (info.pay_mode === 'key' ? '<p class="m" style="margin:10px 0 0">' + T.key + ': ' + esc(info.pix_key) + '</p><button type="button" class="alt" id="ok">' + T.paid + '</button>' : '<p class="m" style="text-align:center;margin:12px 0 0">' + T.waiting + '</p>');
+      document.getElementById('cp').onclick = function(){ var b = this; (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(function(){ b.textContent = T.copied; }).catch(function(){ var r = document.createRange(); r.selectNodeContents(document.getElementById('cc')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }); };
+      var okb = document.getElementById('ok');
+      if (okb) okb.onclick = function(){ okb.disabled = true; rpc('fluida_booking_link_claim_paid', { p_hash: hash }).then(function(){ info.claimed = true; renderPay(); }).catch(function(e){ er.textContent = e.message; okb.disabled = false; }); };
+    }
+    if (info.pay_mode === 'key') { show(brcode(info.pix_key, info.deposit, info.business, info.pix_city, info.booking_code || 'FLUIDA')); return; }
+    fn({ action:'pix', t: token }).then(function(d){
+      if (d.status === 'approved') return load();
+      show(d.qr_code, d.qr_code_base64);
+      clearInterval(poll);
+      poll = setInterval(function(){ fn({ action:'check', t: token }).then(function(c){ if (c.status === 'approved') { clearInterval(poll); load(); } }).catch(function(){}); }, 5000);
+    }).catch(function(e){ px.innerHTML = ''; er.textContent = e.message; });
+  }
+
+  function render(){
+    document.title = info.business + ' · ' + info.itinerary;
+    if (info.color && /^#[0-9a-f]{6}$/i.test(info.color)) document.documentElement.style.setProperty('--c', info.color);
+    if (info.status === 'paid') { app.innerHTML = header() + '<section class="card ok"><h1>' + T.done + '</h1><p>' + T.doneMp + '</p>' + (info.booking_code ? '<p class="m">' + T.code + ': ' + esc(info.booking_code) + '</p>' : '') + '</section>' + foot(); return; }
+    if (info.status === 'booked') return renderPay();
+    if (info.status !== 'open') { app.innerHTML = header() + '<section class="card"><p>' + T.expired + '</p></section>' + foot(); return; }
+    renderForm();
+  }
+  function load(){
+    return rpc('fluida_booking_link_info', { p_hash: hash }).then(function(d){ if (!d) { app.innerHTML = '<section class="card"><p>' + T.notFound + '</p></section>'; return; } info = d; render(); });
+  }
+  if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) { app.innerHTML = '<section class="card"><p>' + T.notFound + '</p></section>'; return; }
+  sha256(token).then(function(h){ hash = h; return load(); }).catch(function(){ app.innerHTML = '<section class="card"><p>' + T.notFound + '</p></section>'; });
+})();
+</script>
+</body>
+</html>

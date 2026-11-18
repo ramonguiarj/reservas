@@ -183,6 +183,7 @@
     if (local) { if (!LOCAL_OK(local)) throw new Error('Confira o endereço de envio: use só letras, números, ponto ou hífen (3 a 40 caracteres).'); out.sender_local = local; }
     if (reply) out.reply_to = reply;
     const pix = txt('#fb-pix', 140); if (pix) out.pix_key = pix;
+    const pixCity = txt('#fb-pix-city', 15); if (pixCity) out.pix_city = pixCity;
     const rem = section.querySelector('#fb-reminder'); if (rem) out.reminder = rem.checked;
     if (welcome) out.welcome_text = welcome;
     if (footer) out.footer_text = footer;
@@ -258,6 +259,12 @@
       <p class="m">Nas reservas com saldo em aberto aparece o botão <b>Cobrar no WhatsApp</b>, com a mensagem pronta no idioma do cliente. Se quiser, a mensagem já leva a sua chave Pix.</p>
       <label for="fb-pix">Sua chave Pix (opcional)</label>
       <input id="fb-pix" maxlength="140" autocomplete="off" value="${escape(v.pix_key || '')}" placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória">
+      <p class="m" style="font-size:13px;margin:4px 0 0">Se a chave for telefone, use +55 e o DDD, por exemplo +5521999990000.</p>
+      <label for="fb-pix-city">Cidade da chave Pix</label>
+      <input id="fb-pix-city" maxlength="15" value="${escape(v.pix_city || '')}" placeholder="RIO DE JANEIRO">
+      <h4 style="margin:18px 0 4px">Receber o sinal pelo link de reserva</h4>
+      <p class="m">Conecte o seu Mercado Pago para o sinal ser confirmado sozinho quando o cliente pagar. Sem conectar, o cliente paga na sua chave Pix acima e você confirma.</p>
+      <div id="fb-mp" class="m">Verificando…</div>
       <h4 style="margin:18px 0 4px">Como o voucher aparece</h4>
       <label for="fb-welcome-text">Mensagem de boas-vindas (português)</label>
       <textarea id="fb-welcome-text" rows="3" maxlength="800" placeholder="Com este voucher confirmamos sua reserva. Confira os detalhes e as informações importantes para sua experiência.">${escape(v.welcome_text || '')}</textarea>
@@ -313,6 +320,7 @@
     section.querySelector('#fb-reset').onclick = () => { section.querySelector('#fb-primary').value = DEFAULTS.primary; section.querySelector('#fb-accent').value = DEFAULTS.accent; };
     section.querySelector('#fb-save').onclick = () => saveBranding(section);
     section.querySelector('#fb-import').onclick = () => openImport();
+    safe(() => paintMp(section));
     section.querySelector('#fb-preview').onclick = () => previewVoucher(section);
   }
 
@@ -703,6 +711,101 @@
 
 
 
+
+  // ---------------- Link de reserva com sinal ----------------
+  async function paintMp(section){
+    const box = section.querySelector('#fb-mp'), a = account(); if (!box || !a) return;
+    const r = await client().rpc('fluida_mp_status', { p_account: a.id });
+    const st = r.data || {};
+    box.innerHTML = st.connected
+      ? `<p style="margin:0 0 6px"><b style="color:#205c38">✓ Mercado Pago conectado</b>${st.connected_at ? ' desde ' + fmtDate(st.connected_at) : ''}</p><button type="button" class="alt" id="fb-mp-off">Desconectar</button>`
+      : `<button type="button" id="fb-mp-on">Conectar Mercado Pago</button>`;
+    const on = box.querySelector('#fb-mp-on'), off = box.querySelector('#fb-mp-off');
+    if (on) on.onclick = async () => {
+      on.disabled = true;
+      const res = await client().functions.invoke('fluida-mp-connect', { body: { action: 'start' } });
+      let d = res.data; if (res.error) { try { d = await res.error.context.json(); } catch (e) {} }
+      if (d?.url) location.href = d.url; else { notify(d?.error || 'Não foi possível conectar agora.'); on.disabled = false; }
+    };
+    if (off) off.onclick = async () => { if (!confirm('Desconectar o Mercado Pago? Os próximos links passam a usar a chave Pix.')) return; await client().functions.invoke('fluida-mp-connect', { body: { action: 'disconnect' } }); paintMp(section); };
+  }
+  let mpHandled = false;
+  function handleMpReturn(){
+    if (mpHandled) return; const q = new URLSearchParams(location.search).get('mp'); if (!q) return; mpHandled = true;
+    const u = new URL(location.href); u.searchParams.delete('mp'); history.replaceState(null, '', u);
+    notify(q === 'conectado' ? 'Mercado Pago conectado! Os sinais dos links de reserva serão confirmados automaticamente.' : 'Não foi possível conectar o Mercado Pago. Tente de novo.');
+  }
+  const linkTokens = () => { try { return JSON.parse(localStorage.getItem('fluida-link-tokens') || '{}'); } catch (e) { return {}; } };
+  const saveLinkToken = (id, tk) => { try { const m = linkTokens(); m[id] = tk; localStorage.setItem('fluida-link-tokens', JSON.stringify(m)); } catch (e) {} };
+  const linkUrl = tk => `${location.origin}/reservar?t=${tk}`;
+  async function sha256hex(s){ const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+  function openLinks(){
+    const dlg = document.getElementById('dlg'), a = account(); if (!dlg || !a) return;
+    let its = []; try { its = (typeof itineraryCache !== 'undefined' ? itineraryCache : []).filter(i => i.active !== false); } catch (e) {}
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    dlg.innerHTML = `<form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form>
+      <h2 style="margin:0">Link de reserva com sinal</h2>
+      <p class="m">Crie o link com o passeio combinado e mande no WhatsApp. O cliente preenche os dados e paga o sinal no Pix; a reserva entra sozinha na sua agenda.</p>
+      ${(branding().voucher && branding().voucher.pix_key) ? '' : '<p style="background:#fff6e0;border-radius:10px;padding:10px 12px;font-size:14px">Para o cliente pagar o sinal, cadastre sua <b>chave Pix</b> ou conecte o <b>Mercado Pago</b> em Menu → Configurações → Cobrança pelo WhatsApp. Sem isso, o cliente só envia os dados e você combina o pagamento.</p>'}
+      <label for="lk-it">Roteiro</label>
+      <input id="lk-it" list="lk-its" maxlength="200" placeholder="Ex.: Cristo Redentor e Pão de Açúcar"><datalist id="lk-its">${its.map(i => `<option value="${escape(i.name)}">`).join('')}</datalist>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 12px">
+        <div><label for="lk-date">Data</label><input id="lk-date" type="date" min="${today}"></div>
+        <div><label for="lk-time">Horário</label><input id="lk-time" type="time"></div>
+        <div><label for="lk-pax">Pessoas</label><input id="lk-pax" type="number" min="1" max="200" value="2"></div>
+        <div><label for="lk-total">Valor total (R$)</label><input id="lk-total" type="number" min="0" step="0.01" inputmode="decimal"></div>
+        <div><label for="lk-dep">Sinal (R$)</label><input id="lk-dep" type="number" min="0" step="0.01" inputmode="decimal"></div>
+        <div><label for="lk-days">Link vale por</label><select id="lk-days"><option value="1">1 dia</option><option value="2">2 dias</option><option value="3" selected>3 dias</option><option value="7">7 dias</option></select></div>
+      </div>
+      <label for="lk-pick">Ponto de encontro (opcional)</label><input id="lk-pick" maxlength="300">
+      <label for="lk-msg">Mensagem para o cliente (opcional)</label><textarea id="lk-msg" rows="2" maxlength="800" placeholder="Ex.: Inclui transporte e ingressos."></textarea>
+      <p id="lk-err" class="m" role="status"></p>
+      <div class="acts"><button type="button" id="lk-go">Criar link</button></div>
+      <div id="lk-out"></div>
+      <h3 style="margin-top:24px">Links criados</h3><div id="lk-list"><p class="m">Carregando…</p></div>`;
+    if (!dlg.open) dlg.showModal();
+    const $ = s => dlg.querySelector(s);
+    const recalc = () => { const it = its.find(i => i.name === $('#lk-it').value); if (it && Number(it.price) > 0) { const tot = Math.round(Number(it.price) * Math.max(1, Number($('#lk-pax').value || 1)) * 100) / 100; $('#lk-total').value = tot.toFixed(2); $('#lk-dep').value = (Math.round(tot * 0.3)).toFixed(2); } };
+    $('#lk-it').oninput = recalc; $('#lk-pax').oninput = recalc;
+    $('#lk-total').oninput = () => { const tot = Number($('#lk-total').value || 0); if (tot > 0) $('#lk-dep').value = (Math.round(tot * 0.3)).toFixed(2); };
+    $('#lk-go').onclick = async () => {
+      const err = $('#lk-err'), go = $('#lk-go'); err.textContent = '';
+      const body = { account_id: a.id, itinerary: $('#lk-it').value.trim(), tour_date: $('#lk-date').value, tour_time: $('#lk-time').value, pax: Number($('#lk-pax').value || 1),
+        total: Number($('#lk-total').value || 0), deposit: Number($('#lk-dep').value || 0), pickup: $('#lk-pick').value.trim(), message: $('#lk-msg').value.trim(), days: Number($('#lk-days').value) };
+      if (!body.itinerary || !body.tour_date) { err.textContent = 'Informe o roteiro e a data.'; return; }
+      if (!(body.total > 0) || !(body.deposit > 0) || body.deposit > body.total) { err.textContent = 'Confira o valor total e o sinal (o sinal não pode ser maior que o total).'; return; }
+      go.disabled = true; err.textContent = 'Criando…';
+      try {
+        const raw = crypto.getRandomValues(new Uint8Array(24)); const tk = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const r = await client().rpc('fluida_create_booking_link', { p_hash: await sha256hex(tk), p_link: body });
+        if (r.error) throw new Error(r.error.message);
+        saveLinkToken(r.data.id, tk);
+        const url = linkUrl(tk), brl = v => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const d = body.tour_date.split('-').reverse().join('/');
+        const msg = `Olá! Segue o link para confirmar sua reserva: ${body.itinerary} em ${d}${body.tour_time ? ' às ' + body.tour_time : ''} (${body.pax} pessoa${body.pax > 1 ? 's' : ''}). Total ${brl(body.total)}; para garantir, o sinal é de ${brl(body.deposit)} no Pix.\n\n${url}`;
+        err.textContent = 'Link criado. Envie para o cliente:';
+        $('#lk-out').innerHTML = `<input readonly value="${escape(url)}" style="margin:6px 0"><div class="acts"><a class="button" target="_blank" rel="noopener" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1f8f4e;color:#fff;text-decoration:none;font-weight:700" href="https://wa.me/?text=${encodeURIComponent(msg)}">Enviar no WhatsApp</a><button type="button" class="alt" id="lk-copy">Copiar link</button></div>`;
+        $('#lk-copy').onclick = async () => { try { await navigator.clipboard.writeText(url); err.textContent = 'Link copiado.'; } catch (e) {} };
+        loadLinks();
+      } catch (e) { err.textContent = e.message || 'Não foi possível criar o link.'; }
+      finally { go.disabled = false; }
+    };
+    async function loadLinks(){
+      const box = $('#lk-list'); if (!box) return;
+      const r = await client().rpc('fluida_list_booking_links', { p_account: a.id });
+      const rows = r.data || [], toks = linkTokens(), brl = v => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const lab = { open: ['Aguardando cliente', '#705008'], booked: ['Reserva criada · sinal pendente', '#705008'], paid: ['Sinal pago', '#205c38'], expired: ['Expirado', '#6b7a75'], cancelled: ['Cancelado', '#6b7a75'] };
+      box.innerHTML = rows.length ? rows.map(l => `<div style="border:1px solid #dde4db;border-radius:12px;padding:10px 12px;margin:0 0 8px;background:#fff">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${escape(l.itinerary)}</b><span style="color:${lab[l.status][1]};font-weight:600;font-size:13px">${lab[l.status][0]}${l.claimed && l.status === 'booked' ? ' · cliente disse que pagou' : ''}</span></div>
+          <div class="m" style="font-size:13px">${String(l.tour_date).split('-').reverse().join('/')} · ${l.pax} pessoa(s) · total ${brl(l.total)} · sinal ${brl(l.deposit)}${l.client_name ? ' · ' + escape(l.client_name) : ''}</div>
+          <div class="acts" style="margin-top:6px">${l.status === 'open' && toks[l.id] ? `<button type="button" class="alt" data-lk-copy="${escape(toks[l.id])}">Copiar link</button>` : ''}${l.booking_id ? `<button type="button" class="alt" data-lk-open="${escape(l.booking_id)}">Abrir reserva</button>` : ''}${l.status === 'open' ? `<button type="button" class="alt" data-lk-cancel="${escape(l.id)}">Cancelar</button>` : ''}</div></div>`).join('') : '<p class="m">Nenhum link criado ainda.</p>';
+      box.querySelectorAll('[data-lk-copy]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(linkUrl(b.dataset.lkCopy)); b.textContent = 'Copiado'; } catch (e) {} });
+      box.querySelectorAll('[data-lk-open]').forEach(b => b.onclick = () => { dlg.close(); try { load().then(() => openBooking(b.dataset.lkOpen)); } catch (e) { openBooking(b.dataset.lkOpen); } });
+      box.querySelectorAll('[data-lk-cancel]').forEach(b => b.onclick = async () => { b.disabled = true; await client().rpc('fluida_cancel_booking_link', { p_id: b.dataset.lkCancel }); loadLinks(); });
+    }
+    loadLinks();
+  }
+  window.fluidaOpenLinks = openLinks;
   // ---------------- Importar reservas de planilha ----------------
   const IMPORT_FIELDS = [
     ['client_name', 'Nome do cliente', true, ['nome', 'cliente', 'nome do cliente', 'name', 'client', 'customer', 'hospede', 'hóspede', 'passageiro']],
@@ -935,6 +1038,7 @@
       safe(applyOnboarding);
       safe(handleCheckoutReturn);
       safe(handleAssinarLink);
+      safe(handleMpReturn);
     }
     if (!a) { const bs = document.getElementById('fluida-block-screen'), bb = document.getElementById('fluida-billing-banner'); if (bs) bs.remove(); if (bb) { bb.remove(); document.body.style.paddingBottom = ''; } }
     safe(applyLogin);

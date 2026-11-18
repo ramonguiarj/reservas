@@ -1,6 +1,16 @@
 {
   "rewrites": [
-    { "source": "/conheca", "destination": "/conheca.html" },
-    { "source": "/guias", "destination": "/conheca.html" }
+    {
+      "source": "/conheca",
+      "destination": "/conheca.html"
+    },
+    {
+      "source": "/guias",
+      "destination": "/conheca.html"
+    },
+    {
+      "source": "/reservar",
+      "destination": "/reservar.html"
+    }
   ]
 }
