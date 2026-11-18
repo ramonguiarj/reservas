@@ -1,0 +1,6 @@
+-- Migrações fluida_lembretes_assinatura (+_vigentes) — 18/11/2026
+-- Tabela fluida_billing_private.reminders (account_id, kind soon|expired|blocked, due) única por vencimento.
+-- public.fluida_billing_reminders_claim(): cria lembretes devidos, descarta os obsoletos (pagou/isento) e entrega os pendentes.
+-- public.fluida_billing_reminders_done(id, ok, erro). Ambas só para service_role.
+-- Cron "fluida-billing-reminders": 7 12-23 * * * (9h–20h de Brasília) chama a função fluida-billing-reminders.
+-- O e-mail leva para https://reservasfluida.com.br/?assinar=1, que abre a tela de assinatura.

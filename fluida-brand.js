@@ -612,6 +612,15 @@
     if (!r.error && r.data) { Object.assign(a, r.data); const el = document.getElementById('fluida-billing-banner'); if (el) el.dataset.key = ''; applyAll(); }
   }
 
+  let assinarHandled = false;
+  function handleAssinarLink(){
+    if (assinarHandled || !account()) return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('assinar') !== '1') return;
+    assinarHandled = true;
+    params.delete('assinar'); const u = new URL(location.href); u.search = params.toString(); history.replaceState(null, '', u);
+    if (isCustom() && member()?.role === 'owner' && account().billing_status !== 'exempt') setTimeout(openSubscribe, 600);
+  }
   let returnHandled = false;
   function handleCheckoutReturn(){
     if (returnHandled || !account()) return;
@@ -633,7 +642,7 @@
       { done: !!b.logo, title: 'Coloque seu logo e suas cores', path: 'Menu → Configurações → Personalização da sua marca', go: 'settings', focus: '#fluida-brand-section' },
       { done: !!String(a.cancel_policy || '').trim(), title: 'Escreva sua política de cancelamento', path: 'Menu → Configurações → Política de cancelamento', go: 'settings', focus: '#a_cp' },
       { done: !!(v.reply_to || v.sender_name), title: 'Configure o e-mail do voucher', path: 'Menu → Configurações → E-mail do voucher', go: 'settings', focus: '#fb-sender' },
-      { done: roteiros > 0, title: 'Cadastre seus roteiros e valores', path: 'Menu → Roteiros', go: 'itineraries' },
+      { done: roteiros > 0, title: 'Cadastre seus roteiros e valores', path: 'Menu → Itinerários', go: 'itineraries' },
       { done: !!String(a.review_url || '').trim(), title: 'Adicione o link de avaliação (Google, TripAdvisor…)', path: 'Menu → Configurações → Link de avaliação', go: 'settings', focus: '#a_rv' },
       { done: reservas > 0, title: 'Crie sua primeira reserva', path: 'Botão "Nova reserva" no topo', go: 'booking' },
       { done: false, optional: true, title: 'Convide sua equipe (opcional)', path: 'Menu → Equipe', go: 'team' },
@@ -679,6 +688,7 @@
       safe(applyBillingBanner);
       safe(applyOnboarding);
       safe(handleCheckoutReturn);
+      safe(handleAssinarLink);
     }
     if (!a) { const bs = document.getElementById('fluida-block-screen'), bb = document.getElementById('fluida-billing-banner'); if (bs) bs.remove(); if (bb) { bb.remove(); document.body.style.paddingBottom = ''; } }
     safe(applyLogin);
