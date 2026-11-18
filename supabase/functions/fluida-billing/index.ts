@@ -22,7 +22,7 @@ function env() {
     secret: JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}').default || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
     mpToken: Deno.env.get('MP_ACCESS_TOKEN') || '',
     price: Number(Deno.env.get('FLUIDA_PRICE') || '100'),
-    appUrl: Deno.env.get('FLUIDA_APP_URL') || 'https://reservasfluida.vercel.app',
+    appUrl: Deno.env.get('FLUIDA_APP_URL') || 'https://reservasfluida.com.br',
     webhook: `${url}/functions/v1/fluida-billing?webhook=1`,
   }
 }
@@ -86,6 +86,13 @@ async function handleWebhook(admin: any, token: string, topic: string, id: strin
   }
 }
 
+// Volta para o mesmo endereço em que o guia está logado (domínio próprio ou o antigo .vercel.app).
+const APP_ORIGINS = ['https://reservasfluida.com.br', 'https://www.reservasfluida.com.br', 'https://reservasfluida.vercel.app']
+function appOrigin(request: Request, fallback: string) {
+  const o = request.headers.get('origin') || ''
+  return APP_ORIGINS.includes(o) ? o.replace('://www.', '://') : fallback
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
   const E = env()
@@ -133,7 +140,7 @@ Deno.serve(async (request) => {
           external_reference: accountId,
           payer_email: payerEmail,
           auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: E.price, currency_id: 'BRL' },
-          back_url: `${E.appUrl}/?assinatura=retorno`,
+          back_url: `${appOrigin(request, E.appUrl)}/?assinatura=retorno`,
           status: 'pending',
         }),
       })
