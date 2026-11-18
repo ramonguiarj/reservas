@@ -12,7 +12,7 @@ Deno.serve(async (request) => {
   const supaUrl = Deno.env.get('SUPABASE_URL') || ''
   const publishable = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}').default || Deno.env.get('SUPABASE_ANON_KEY') || ''
   const secret = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}').default || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-  const clientId = Deno.env.get('MP_CLIENT_ID') || '', clientSecret = Deno.env.get('MP_CLIENT_SECRET') || ''
+  const clientId = (Deno.env.get('MP_CLIENT_ID') || '').trim(), clientSecret = (Deno.env.get('MP_CLIENT_SECRET') || '').trim()
   const admin = createClient(supaUrl, secret, { auth: { persistSession: false, autoRefreshToken: false } })
   const url = new URL(request.url)
 
@@ -46,7 +46,11 @@ Deno.serve(async (request) => {
   const body = await request.json().catch(() => ({}))
 
   if (body.action === 'start') {
-    if (!clientId || !clientSecret) return json({ error: 'A conexão com o Mercado Pago ainda está sendo configurada. Por enquanto, use a chave Pix.' }, 503)
+    if (!clientId || !clientSecret) {
+      const names = Object.keys(Deno.env.toObject()).filter(k => /^MP_/i.test(k.trim()))
+      console.error('MP OAuth sem segredos', JSON.stringify({ id: !!clientId, secret: !!clientSecret, names }))
+      return json({ error: 'A conexão com o Mercado Pago ainda está sendo configurada. Por enquanto, use a chave Pix.', faltando: [!clientId && 'MP_CLIENT_ID', !clientSecret && 'MP_CLIENT_SECRET'].filter(Boolean), encontrados: names }, 503)
+    }
     const state = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
     await admin.rpc('fluida_mp_state_create', { p_state: state, p_account: member.account_id, p_user: u.user.id })
     const auth = `https://auth.mercadopago.com.br/authorization?client_id=${encodeURIComponent(clientId)}&response_type=code&platform_id=mp&state=${state}&redirect_uri=${encodeURIComponent(REDIRECT)}`
