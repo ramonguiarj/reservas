@@ -276,6 +276,9 @@
         <div><label for="fb-fin-ticket">Coluna "${escape(window.fluidaFinLabel ? fluidaFinLabel('ticket') : 'Cristo')}"</label><input id="fb-fin-ticket" maxlength="30" value="${escape(fin.ticket || '')}" placeholder="Ex.: Ingressos"></div>
         <div><label for="fb-fin-guide">Coluna "${escape(window.fluidaFinLabel ? fluidaFinLabel('guide') : 'Outro guia')}"</label><input id="fb-fin-guide" maxlength="30" value="${escape(fin.guide || '')}" placeholder="Ex.: Guia parceiro"></div>
       </div>
+      <h4 style="margin:22px 0 4px">Trazer reservas de uma planilha</h4>
+      <p class="m">Vem de planilha, Google Sheets ou outro sistema? Envie um arquivo Excel (.xlsx) ou CSV e as reservas entram de uma vez, com os pagamentos já feitos.</p>
+      <div class="acts" style="margin-top:6px"><button type="button" class="alt" id="fb-import">Importar planilha</button></div>
       <p id="fb-msg" class="m" role="status"></p>
       <div class="acts"><button type="button" id="fb-save">Salvar personalização</button><button type="button" class="alt" id="fb-reset">Voltar às cores padrão</button></div>`;
     const acts = dlg.querySelector('.acts');
@@ -309,6 +312,7 @@
     senderIn.addEventListener('input', updLocal); updLocal();
     section.querySelector('#fb-reset').onclick = () => { section.querySelector('#fb-primary').value = DEFAULTS.primary; section.querySelector('#fb-accent').value = DEFAULTS.accent; };
     section.querySelector('#fb-save').onclick = () => saveBranding(section);
+    section.querySelector('#fb-import').onclick = () => openImport();
     section.querySelector('#fb-preview').onclick = () => previewVoucher(section);
   }
 
@@ -698,6 +702,183 @@
   }
 
 
+
+  // ---------------- Importar reservas de planilha ----------------
+  const IMPORT_FIELDS = [
+    ['client_name', 'Nome do cliente', true, ['nome', 'cliente', 'nome do cliente', 'name', 'client', 'customer', 'hospede', 'hóspede', 'passageiro']],
+    ['tour_date', 'Data do passeio', true, ['data', 'data do passeio', 'dia', 'date', 'tour date', 'data passeio', 'data tour']],
+    ['itinerary', 'Roteiro / passeio', true, ['roteiro', 'passeio', 'tour', 'itinerario', 'itinerário', 'servico', 'serviço', 'produto', 'atividade']],
+    ['tour_time', 'Horário', false, ['horario', 'horário', 'hora', 'time', 'saida', 'saída']],
+    ['pax', 'Pessoas', false, ['pessoas', 'pax', 'qtd', 'quantidade', 'participantes', 'pessoas (pax)', 'people', 'guests', 'adultos']],
+    ['total', 'Valor total (R$)', false, ['valor', 'total', 'valor total', 'preco', 'preço', 'price', 'amount', 'valor do passeio']],
+    ['paid', 'Valor já pago (R$)', false, ['pago', 'valor pago', 'sinal', 'ja pago', 'já pago', 'recebido', 'paid', 'deposit', 'entrada']],
+    ['method', 'Forma de pagamento', false, ['forma de pagamento', 'pagamento', 'forma', 'metodo', 'método', 'payment', 'meio de pagamento']],
+    ['client_phone', 'WhatsApp / telefone', false, ['telefone', 'whatsapp', 'celular', 'fone', 'phone', 'contato', 'tel']],
+    ['client_email', 'E-mail', false, ['email', 'e-mail', 'mail']],
+    ['client_document', 'Documento', false, ['documento', 'cpf', 'rg', 'passaporte', 'document', 'passport']],
+    ['pickup_location', 'Hotel / ponto de encontro', false, ['hotel', 'hospedagem', 'endereco', 'endereço', 'ponto de encontro', 'encontro', 'pickup', 'local', 'busca']],
+    ['notes', 'Observações', false, ['observacoes', 'observações', 'obs', 'notas', 'notes', 'comentarios', 'comentários']],
+  ];
+  const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  function parseCSV(text){
+    text = text.replace(/^﻿/, '');
+    const first = text.split(/\r?\n/)[0] || '';
+    const sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : (first.includes('\t') ? '\t' : ',');
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; continue; }
+      if (c === '"') q = true; else if (c === sep) { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += c;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(r => r.some(x => String(x).trim() !== ''));
+  }
+  function loadSheetJS(){
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/vendor/xlsx.full.min.js'; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error('Não foi possível abrir arquivos Excel agora. Salve a planilha como CSV e tente de novo.')); document.head.appendChild(s); });
+  }
+  async function readSheet(file){
+    if (/\.csv$|\.txt$/i.test(file.name)) return parseCSV(await file.text());
+    const X = await loadSheetJS();
+    const wb = X.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }).filter(r => r.some(x => String(x).trim() !== ''));
+  }
+  const pad = n => String(n).padStart(2, '0');
+  function parseDate(v){
+    if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`;
+    if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+    const s = String(v || '').trim(); let m;
+    if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+    if ((m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/.exec(s))) { let y = Number(m[3]); if (y < 100) y += 2000; const d = Number(m[1]), mo = Number(m[2]); if (mo < 1 || mo > 12 || d < 1 || d > 31) return ''; return `${y}-${pad(mo)}-${pad(d)}`; }
+    return '';
+  }
+  function parseTime(v){
+    if (v instanceof Date && !isNaN(v)) return `${pad(v.getHours())}:${pad(v.getMinutes())}`;
+    if (typeof v === 'number' && v >= 0 && v < 1) { const mins = Math.round(v * 1440); return `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`; }
+    const m = /(\d{1,2})\s*[:hH]\s*(\d{2})?/.exec(String(v || '')); if (!m) return '';
+    const h = Number(m[1]), mi = Number(m[2] || 0); return h < 24 && mi < 60 ? `${pad(h)}:${pad(mi)}` : '';
+  }
+  function parseMoney(v){
+    if (typeof v === 'number') return Math.round(v * 100) / 100;
+    let s = String(v || '').replace(/[^\d,.\-]/g, ''); if (!s) return 0;
+    if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    else if (s.includes(',')) s = /,\d{1,2}$/.test(s) ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    else if (/\.\d{3}$/.test(s) && s.split('.').length > 1 && !/\.\d{1,2}$/.test(s)) s = s.replace(/\./g, '');
+    const n = Number(s); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+  function parseMethod(v){
+    const s = norm(v);
+    if (!s) return 'Pix';
+    if (/credit|credito/.test(s)) return 'Cartão de crédito';
+    if (/debit|debito/.test(s)) return 'Cartão de débito';
+    if (/cart|card/.test(s)) return 'Cartão de crédito';
+    if (/dinheiro|cash|especie/.test(s)) return 'Dinheiro';
+    if (/transf|ted|doc|banco/.test(s)) return 'Transferência';
+    return 'Pix';
+  }
+  function guessMapping(header){
+    const map = {};
+    IMPORT_FIELDS.forEach(([key, , , syn]) => {
+      const idx = header.findIndex((h, i) => !Object.values(map).includes(i) && syn.includes(norm(h)));
+      if (idx >= 0) map[key] = idx;
+    });
+    IMPORT_FIELDS.forEach(([key, , , syn]) => {
+      if (map[key] !== undefined) return;
+      const idx = header.findIndex((h, i) => !Object.values(map).includes(i) && syn.some(s => norm(h).includes(s)));
+      if (idx >= 0) map[key] = idx;
+    });
+    return map;
+  }
+  function buildRows(data, map){
+    const get = (r, k) => map[k] === undefined || map[k] === '' ? '' : r[Number(map[k])];
+    return data.map((r, i) => {
+      const errs = [];
+      const name = String(get(r, 'client_name') || '').trim();
+      const date = parseDate(get(r, 'tour_date'));
+      const it = String(get(r, 'itinerary') || '').trim();
+      const pax = Math.max(1, parseInt(String(get(r, 'pax') || '1').replace(/\D/g, '') || '1', 10));
+      const total = parseMoney(get(r, 'total'));
+      let paid = parseMoney(get(r, 'paid'));
+      if (!name) errs.push('sem nome'); if (!date) errs.push('data inválida'); if (!it) errs.push('sem roteiro');
+      if (paid > total) { paid = total; }
+      return { line: i + 2, errs, name, date, it, pax, total, paid, time: parseTime(get(r, 'tour_time')), method: parseMethod(get(r, 'method')),
+        phone: String(get(r, 'client_phone') || '').trim(), email: String(get(r, 'client_email') || '').trim().toLowerCase(),
+        doc: String(get(r, 'client_document') || '').trim(), pickup: String(get(r, 'pickup_location') || '').trim(), notes: String(get(r, 'notes') || '').trim() };
+    });
+  }
+  function importTemplate(){
+    const csv = 'Nome do cliente;Data do passeio;Horário;Roteiro;Pessoas;Valor total;Valor pago;Forma de pagamento;WhatsApp;E-mail;Hotel;Observações\n' +
+      'Maria Silva;25/12/2026;08:00;Cristo Redentor e Pão de Açúcar;2;780,00;200,00;Pix;(21) 99999-0000;maria@email.com;Hotel Copacabana;\n';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'modelo-importacao-fluida.csv'; a.click();
+  }
+  function openImport(){
+    const dlg = document.getElementById('dlg'); if (!dlg) return;
+    let header = [], data = [], map = {};
+    dlg.innerHTML = `<form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form>
+      <h2 style="margin:0">Importar reservas</h2>
+      <p class="m">Envie uma planilha com uma reserva por linha e os títulos na primeira linha. Precisa ter pelo menos <b>nome do cliente</b>, <b>data</b> e <b>roteiro</b>. Valor, valor pago, horário, pessoas, WhatsApp, e-mail e hotel são opcionais.</p>
+      <div class="acts"><button type="button" class="alt" id="im-model">Baixar planilha modelo</button></div>
+      <label for="im-file">Arquivo (.xlsx ou .csv)</label>
+      <input id="im-file" type="file" accept=".xlsx,.xls,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      <p id="im-msg" class="m" role="status"></p>
+      <div id="im-map"></div><div id="im-preview"></div>
+      <div class="acts" id="im-acts" hidden><button type="button" id="im-go">Importar</button></div>`;
+    if (!dlg.open) dlg.showModal();
+    const msg = dlg.querySelector('#im-msg');
+    dlg.querySelector('#im-model').onclick = importTemplate;
+    const render = () => {
+      const rows = buildRows(data, map), ok = rows.filter(r => !r.errs.length), bad = rows.filter(r => r.errs.length);
+      dlg.querySelector('#im-map').innerHTML = `<h3 style="margin:16px 0 6px">Colunas da sua planilha</h3><p class="m" style="margin-top:0">Confira se cada informação foi ligada à coluna certa.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 14px">${IMPORT_FIELDS.map(([k, label, req]) => `<label style="font-size:14px">${escape(label)}${req ? ' *' : ''}<select data-map="${k}"><option value="">— não tem —</option>${header.map((h, i) => `<option value="${i}" ${String(map[k]) === String(i) ? 'selected' : ''}>${escape(String(h || 'Coluna ' + (i + 1)))}</option>`).join('')}</select></label>`).join('')}</div>`;
+      dlg.querySelectorAll('[data-map]').forEach(s => s.onchange = () => { map[s.dataset.map] = s.value; render(); });
+      const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      dlg.querySelector('#im-preview').innerHTML = `<h3 style="margin:18px 0 6px">${ok.length} reserva(s) prontas${bad.length ? ` · <span style="color:#9e2424">${bad.length} com problema</span>` : ''}</h3>
+        <div style="overflow:auto;max-height:320px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left">Linha</th><th style="text-align:left">Cliente</th><th style="text-align:left">Data</th><th style="text-align:left">Roteiro</th><th>Pax</th><th style="text-align:right">Total</th><th style="text-align:right">Pago</th><th style="text-align:left">Situação</th></tr></thead><tbody>
+        ${rows.slice(0, 200).map(r => `<tr style="border-top:1px solid #e1e8e2;${r.errs.length ? 'color:#9e2424' : ''}"><td>${r.line}</td><td>${escape(r.name)}</td><td>${r.date ? r.date.split('-').reverse().join('/') : ''}${r.time ? ' ' + r.time : ''}</td><td>${escape(r.it)}</td><td style="text-align:center">${r.pax}</td><td style="text-align:right">${brl(r.total)}</td><td style="text-align:right">${brl(r.paid)}</td><td>${r.errs.length ? escape(r.errs.join(', ')) : 'ok'}</td></tr>`).join('')}
+        </tbody></table></div>${rows.length > 200 ? `<p class="m">Mostrando 200 de ${rows.length} linhas.</p>` : ''}
+        ${bad.length ? '<p class="m">Linhas com problema serão puladas. Corrija na planilha e importe de novo se quiser.</p>' : ''}
+        <p class="m">Reservas iguais às que já existem (mesmo cliente, data e roteiro) não são duplicadas.</p>`;
+      const acts = dlg.querySelector('#im-acts'); acts.hidden = !ok.length;
+      dlg.querySelector('#im-go').textContent = `Importar ${ok.length} reserva(s)`;
+      dlg.querySelector('#im-go').onclick = () => runImport(ok);
+    };
+    dlg.querySelector('#im-file').onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      msg.textContent = 'Lendo a planilha…';
+      try {
+        const all = await readSheet(file);
+        if (all.length < 2) throw new Error('A planilha precisa ter a linha de títulos e pelo menos uma reserva.');
+        header = all[0].map(x => String(x ?? '').trim()); data = all.slice(1); map = guessMapping(header);
+        msg.textContent = `${data.length} linha(s) encontradas em "${file.name}".`; render();
+      } catch (err) { msg.textContent = err.message || 'Não foi possível ler o arquivo.'; }
+    };
+    async function runImport(rows){
+      const a = account(), db = client(); if (!a || !db) return;
+      const go = dlg.querySelector('#im-go'); go.disabled = true;
+      let done = 0, dup = 0, fail = []; 
+      for (const r of rows) {
+        msg.textContent = `Importando ${done + dup + fail.length + 1} de ${rows.length}…`;
+        const sid = crypto.randomUUID(), total = r.total.toFixed(2);
+        const item = { service_id: sid, itinerary: r.it, tour_date: r.date, tour_time: r.time || '', pax: String(r.pax), service_total: total, pickup: r.pickup || '' };
+        const booking = { client_name: r.name, client_phone: r.phone || null, client_email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email) ? r.email : null, client_document: r.doc || null,
+          tour_date: r.date, tour_time: r.time || null, itinerary: r.it, pickup_location: r.pickup || null, pax: String(r.pax), total, notes: [r.notes, 'Importada de planilha'].filter(Boolean).join(' · '),
+          ticket_included: false, ticket_bought: false, voucher_options: { imported: true }, schedule_items: [item] };
+        const signals = r.paid > 0 ? [{ service_id: sid, amount: r.paid.toFixed(2), method: r.method, installments: '1', paid_at: r.date <= new Date().toISOString().slice(0, 10) ? r.date : new Date().toISOString().slice(0, 10), notes: 'Pagamento importado da planilha' }] : [];
+        try {
+          const res = await db.rpc('fluida_save_booking_v10', { p_account_id: a.id, p_request_id: crypto.randomUUID(), p_booking_id: null, p_expected_version: null, p_booking: booking, p_signals: signals });
+          if (res.error) { if (String(res.error.code) === '23505') dup++; else fail.push(`linha ${r.line}: ${res.error.message}`); }
+          else done++;
+        } catch (err) { fail.push(`linha ${r.line}: ${err.message}`); }
+      }
+      msg.innerHTML = `<b style="color:#205c38">${done} reserva(s) importada(s).</b>${dup ? ` ${dup} já existiam e foram puladas.` : ''}${fail.length ? `<br><span style="color:#9e2424">${fail.length} não entraram:</span><br>${fail.slice(0, 8).map(escape).join('<br>')}` : ''}`;
+      go.textContent = 'Concluído'; dlg.querySelector('#im-acts').insertAdjacentHTML('beforeend', '<button type="button" class="alt" id="im-close">Ver minhas reservas</button>');
+      dlg.querySelector('#im-close').onclick = () => { dlg.close(); try { load(); } catch (e) { location.reload(); } };
+    }
+  }
+  window.fluidaOpenImport = openImport;
   // ---------------- Primeiros passos (contas de guias) ----------------
   function onboardingSteps(){
     const a = account() || {}, b = branding(), v = (b.voucher && typeof b.voucher === 'object') ? b.voucher : {};
