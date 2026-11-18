@@ -177,6 +177,7 @@
     const local = txt('#fb-local', 40).toLowerCase();
     if (local) { if (!LOCAL_OK(local)) throw new Error('Confira o endereço de envio: use só letras, números, ponto ou hífen (3 a 40 caracteres).'); out.sender_local = local; }
     if (reply) out.reply_to = reply;
+    const pix = txt('#fb-pix', 140); if (pix) out.pix_key = pix;
     if (welcome) out.welcome_text = welcome;
     if (footer) out.footer_text = footer;
     const bg = section.querySelector('#fb-header-bg').value;
@@ -245,6 +246,10 @@
       <label for="fb-local">Endereço de envio</label>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><input id="fb-local" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px;max-width:280px" value="${escape(v.sender_local || '')}" placeholder="${escape(slugLocal(v.sender_name || account()?.name) || 'seunome')}"><b>@${SEND_DOMAIN}</b></div>
       <p class="m" style="font-size:13px">O cliente vê: <b id="fb-local-preview"></b>. Use só letras, números, ponto ou hífen. Se deixar em branco, usamos o seu nome.</p>
+      <h4 style="margin:18px 0 4px">Cobrança pelo WhatsApp</h4>
+      <p class="m">Nas reservas com saldo em aberto aparece o botão <b>Cobrar no WhatsApp</b>, com a mensagem pronta no idioma do cliente. Se quiser, a mensagem já leva a sua chave Pix.</p>
+      <label for="fb-pix">Sua chave Pix (opcional)</label>
+      <input id="fb-pix" maxlength="140" autocomplete="off" value="${escape(v.pix_key || '')}" placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória">
       <h4 style="margin:18px 0 4px">Como o voucher aparece</h4>
       <label for="fb-welcome-text">Mensagem de boas-vindas (português)</label>
       <textarea id="fb-welcome-text" rows="3" maxlength="800" placeholder="Com este voucher confirmamos sua reserva. Confira os detalhes e as informações importantes para sua experiência.">${escape(v.welcome_text || '')}</textarea>
