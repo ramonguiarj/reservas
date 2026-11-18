@@ -25,7 +25,7 @@ Deno.serve(async () => {
     const name = esc(n.account_name || 'sua conta')
     const venc = day(n.expiry)
     const bloqueio = day(new Date(new Date(n.expiry).getTime() + 7 * 864e5))
-    const exclusao = day(new Date(new Date(n.expiry).getTime() + 30 * 864e5))
+    const exclusao = day(new Date(new Date(n.expiry).getTime() + 23 * 864e5))
     const what = n.trial ? 'seu teste grátis do Fluida' : 'sua assinatura do Fluida'
     let subject = '', lines: string[] = [], cta = 'Assinar agora'
     if (n.kind === 'soon') {

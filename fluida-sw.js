@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='fluida-shell-20261118-lembretes';
+const CACHE='fluida-shell-20261118-numeros';
 const SHELL=['/','/offline-core.js','/fluida-offline.js','/gmail-cloud-panel.js','/fluida-brand.js','/apple-touch-icon.png','/img/boas-vindas-rio.jpg','/img/voucher-marca.jpg','/privacidade.html','/manifest.webmanifest'];
 const SDK='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 self.addEventListener('install',event=>event.waitUntil((async()=>{

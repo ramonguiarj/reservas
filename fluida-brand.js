@@ -336,6 +336,7 @@
     dlg.innerHTML = `
       <form method="dialog" style="text-align:right"><button class="alt">Fechar</button></form>
       <h2 style="margin:0">Administração Fluida</h2>
+      <div id="pa-stats" style="margin:14px 0 4px"></div>
       <h3>Cadastrar novo guia / negócio</h3>
       <p class="m">O guia recebe uma conta própria e independente: só ele (e a equipe que ele convidar) vê as reservas, clientes e financeiro dessa conta.</p>
       <label for="pa-name">Nome do negócio</label>
@@ -398,6 +399,21 @@
       const r = await client().rpc('fluida_admin_overview');
       if (r.error) throw new Error(r.error.message);
       const accounts = r.data?.accounts || [], invites = r.data?.invites || [];
+      const st = r.data?.stats, boxS = dlg.querySelector('#pa-stats');
+      if (st && boxS) {
+        const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const card = (v, l, c) => `<div style="flex:1 1 140px;border:1px solid #dde4db;border-left:5px solid ${c};border-radius:12px;padding:10px 12px;background:#fff"><b style="font-size:22px;display:block">${v}</b><span class="m" style="font-size:13px">${l}</span></div>`;
+        const conv = st.guides ? Math.round(100 * st.ever_paid / st.guides) : 0;
+        boxS.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px">
+          ${card(brl(st.mrr), 'receita mensal prevista', '#07383a')}
+          ${card(brl(st.revenue_month), 'recebido este mês' + (st.revenue_last_month ? ' · mês passado ' + brl(st.revenue_last_month) : ''), '#205c38')}
+          ${card(st.paying, 'guias pagando' + (st.card ? ' (' + st.card + ' no cartão)' : ''), '#205c38')}
+          ${card(st.trial, 'em teste grátis', '#c08a12')}
+          ${card(st.readonly + st.blocked, 'sem pagamento (' + st.readonly + ' só leitura, ' + st.blocked + ' bloqueados)', '#a4332b')}
+          ${card(conv + '%', 'dos guias já pagaram · ' + st.new_month + (st.new_month === 1 ? ' novo' : ' novos') + ' este mês', '#4a5f9a')}
+        </div>
+        ${(st.recent_payments || []).length ? `<details style="margin-top:8px"><summary class="m">Últimos pagamentos · total ${brl(st.revenue_total)}</summary><ul style="margin:6px 0 0;padding-left:18px">${st.recent_payments.map(p => `<li>${fmtDate(p.at)} · ${escape(p.name || 'conta excluída')} · ${brl(p.amount)} · ${p.kind === 'pix' ? 'Pix' : 'cartão'}</li>`).join('')}</ul></details>` : ''}`;
+      }
       boxI.innerHTML = invites.length ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
         <thead><tr><th style="text-align:left">Negócio</th><th style="text-align:left">E-mail</th><th style="text-align:left">Validade</th><th></th></tr></thead><tbody>
         ${invites.map(i => `<tr style="border-top:1px solid #dde4db"><td>${escape(i.business_name)}</td><td>${escape(i.email)}</td>

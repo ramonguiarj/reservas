@@ -4,3 +4,5 @@
 -- public.fluida_billing_reminders_done(id, ok, erro). Ambas só para service_role.
 -- Cron "fluida-billing-reminders": 7 12-23 * * * (9h–20h de Brasília) chama a função fluida-billing-reminders.
 -- O e-mail leva para https://reservasfluida.com.br/?assinar=1, que abre a tela de assinatura.
+-- fluida_lembretes_janela_exclusao: aviso de bloqueio até 23 dias após o vencimento (exclusão = vencimento + 23 dias).
+-- fluida_admin_overview_numeros: fluida_admin_overview() ganhou 'stats' (pagantes, teste, sem pagamento, receita do mês, últimos pagamentos).
