@@ -6,3 +6,5 @@
 -- RPCs públicas (página /reservar): fluida_booking_link_info, fluida_booking_link_submit, fluida_booking_link_claim_paid.
 -- RPCs só do servidor: fluida_link_by_hash/by_id/set/apply_payment, fluida_mp_state_create/take, fluida_mp_save/delete.
 -- Funções: fluida-booking-pay (Pix do sinal + webhook + avisos ao guia) e fluida-mp-connect (OAuth; segredos MP_CLIENT_ID e MP_CLIENT_SECRET).
+-- fluida_link_dados_cliente (18/11/2026): o cliente também informa a data de aniversário; país/estado vêm do DDI/DDD do WhatsApp
+--   (calculados na página) e o idioma da página vira o idioma do voucher. Grava em client_birthday, client_country, client_state.

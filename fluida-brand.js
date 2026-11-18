@@ -747,14 +747,15 @@
       <h2 style="margin:0">Link de reserva com sinal</h2>
       <p class="m">Crie o link com o passeio combinado e mande no WhatsApp. O cliente preenche os dados e paga o sinal no Pix; a reserva entra sozinha na sua agenda.</p>
       ${(branding().voucher && branding().voucher.pix_key) ? '' : '<p style="background:#fff6e0;border-radius:10px;padding:10px 12px;font-size:14px">Para o cliente pagar o sinal, cadastre sua <b>chave Pix</b> ou conecte o <b>Mercado Pago</b> em Menu → Configurações → Cobrança pelo WhatsApp. Sem isso, o cliente só envia os dados e você combina o pagamento.</p>'}
-      <label for="lk-it">Roteiro</label>
-      <input id="lk-it" list="lk-its" maxlength="200" placeholder="Ex.: Cristo Redentor e Pão de Açúcar"><datalist id="lk-its">${its.map(i => `<option value="${escape(i.name)}">`).join('')}</datalist>
+      <label for="lk-it-sel">Roteiro</label>
+      <select id="lk-it-sel"><option value="">Escolha um roteiro…</option>${its.map((i, n) => `<option value="${n}">${escape(i.name)}${Number(i.price) > 0 ? ' · ' + Number(i.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' / pessoa' : ''}</option>`).join('')}<option value="outro">Outro roteiro (escrever)</option></select>
+      <div id="lk-it-box" hidden><label for="lk-it">Nome do roteiro</label><input id="lk-it" maxlength="200" placeholder="Ex.: Cristo Redentor e Pão de Açúcar"></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 12px">
         <div><label for="lk-date">Data</label><input id="lk-date" type="date" min="${today}"></div>
         <div><label for="lk-time">Horário</label><input id="lk-time" type="time"></div>
         <div><label for="lk-pax">Pessoas</label><input id="lk-pax" type="number" min="1" max="200" value="2"></div>
         <div><label for="lk-total">Valor total (R$)</label><input id="lk-total" type="number" min="0" step="0.01" inputmode="decimal"></div>
-        <div><label for="lk-dep">Sinal (R$)</label><input id="lk-dep" type="number" min="0" step="0.01" inputmode="decimal"></div>
+        <div><label for="lk-dep">Sinal (R$) · 40% sugerido</label><input id="lk-dep" type="number" min="0" step="0.01" inputmode="decimal"></div>
         <div><label for="lk-days">Link vale por</label><select id="lk-days"><option value="1">1 dia</option><option value="2">2 dias</option><option value="3" selected>3 dias</option><option value="7">7 dias</option></select></div>
       </div>
       <label for="lk-pick">Ponto de encontro (opcional)</label><input id="lk-pick" maxlength="300">
@@ -765,12 +766,20 @@
       <h3 style="margin-top:24px">Links criados</h3><div id="lk-list"><p class="m">Carregando…</p></div>`;
     if (!dlg.open) dlg.showModal();
     const $ = s => dlg.querySelector(s);
-    const recalc = () => { const it = its.find(i => i.name === $('#lk-it').value); if (it && Number(it.price) > 0) { const tot = Math.round(Number(it.price) * Math.max(1, Number($('#lk-pax').value || 1)) * 100) / 100; $('#lk-total').value = tot.toFixed(2); $('#lk-dep').value = (Math.round(tot * 0.3)).toFixed(2); } };
-    $('#lk-it').oninput = recalc; $('#lk-pax').oninput = recalc;
-    $('#lk-total').oninput = () => { const tot = Number($('#lk-total').value || 0); if (tot > 0) $('#lk-dep').value = (Math.round(tot * 0.3)).toFixed(2); };
+    const fillIts = () => { const sel = $('#lk-it-sel'), cur = sel.value; sel.innerHTML = '<option value="">Escolha um roteiro…</option>' + its.map((i, n) => `<option value="${n}">${escape(i.name)}${Number(i.price) > 0 ? ' · ' + Number(i.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' / pessoa' : ''}</option>`).join('') + '<option value="outro">Outro roteiro (escrever)</option>'; sel.value = cur === 'outro' ? 'outro' : ''; };
+    client().from('itineraries').select('*').eq('account_id', a.id).order('name').then(r => { if (r.error || !Array.isArray(r.data)) return; const fresh = r.data.filter(i => i.active === true && !/^roteiro personalizado$/i.test(String(i.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())); if (fresh.length) { its = fresh; if ($('#lk-it-sel').value !== 'outro') fillIts(); } });
+    let depManual = false;
+    const pickedIt = () => { const v = $('#lk-it-sel').value; return v === '' || v === 'outro' ? null : its[Number(v)]; };
+    const itName = () => { const it = pickedIt(); return it ? it.name : ($('#lk-it-sel').value === 'outro' ? $('#lk-it').value.trim() : ''); };
+    const suggestDep = () => { if (depManual) return; const tot = Number($('#lk-total').value || 0); $('#lk-dep').value = tot > 0 ? (Math.round(tot * 40) / 100).toFixed(2) : ''; };
+    const recalc = () => { const it = pickedIt(); if (it && Number(it.price) > 0) $('#lk-total').value = (Math.round(Number(it.price) * Math.max(1, Number($('#lk-pax').value || 1)) * 100) / 100).toFixed(2); suggestDep(); };
+    $('#lk-it-sel').onchange = () => { const outro = $('#lk-it-sel').value === 'outro'; $('#lk-it-box').hidden = !outro; if (outro) $('#lk-it').focus(); recalc(); };
+    $('#lk-pax').oninput = recalc;
+    $('#lk-total').oninput = suggestDep;
+    $('#lk-dep').oninput = () => { depManual = $('#lk-dep').value !== ''; };
     $('#lk-go').onclick = async () => {
       const err = $('#lk-err'), go = $('#lk-go'); err.textContent = '';
-      const body = { account_id: a.id, itinerary: $('#lk-it').value.trim(), tour_date: $('#lk-date').value, tour_time: $('#lk-time').value, pax: Number($('#lk-pax').value || 1),
+      const body = { account_id: a.id, itinerary: itName(), tour_date: $('#lk-date').value, tour_time: $('#lk-time').value, pax: Number($('#lk-pax').value || 1),
         total: Number($('#lk-total').value || 0), deposit: Number($('#lk-dep').value || 0), pickup: $('#lk-pick').value.trim(), message: $('#lk-msg').value.trim(), days: Number($('#lk-days').value) };
       if (!body.itinerary || !body.tour_date) { err.textContent = 'Informe o roteiro e a data.'; return; }
       if (!(body.total > 0) || !(body.deposit > 0) || body.deposit > body.total) { err.textContent = 'Confira o valor total e o sinal (o sinal não pode ser maior que o total).'; return; }
