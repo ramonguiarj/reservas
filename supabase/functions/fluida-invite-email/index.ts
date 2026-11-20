@@ -31,7 +31,7 @@ Deno.serve(async (request) => {
     const subject = `Seu acesso ao Fluida está pronto (${inv.business_name})`
     const html = `<div style="font:15px/1.6 Arial,sans-serif;color:#173234;max-width:560px">
       <h2 style="color:#07383a;margin:0 0 12px">Bem-vindo ao Fluida!</h2>
-      <p>Olá! A conta <b>${esc(inv.business_name)}</b> já está liberada para você criar. São <b>7 dias grátis</b>, com tudo liberado.</p>
+      <p>Olá! A conta <b>${esc(inv.business_name)}</b> já está liberada para você criar. São <b>30 dias grátis</b>, com tudo liberado.</p>
       <p style="margin:22px 0"><a href="${link}" style="background:#07383a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Criar minha conta</a></p>
       <p>Use este e-mail (<b>${esc(email)}</b>) e crie uma senha.${until ? ` O convite vale até <b>${until}</b>.` : ''}</p>
       <p>Depois de entrar, siga o quadro <b>Primeiros passos</b> na tela Hoje para colocar seu logo, sua política de cancelamento e seus roteiros.</p>

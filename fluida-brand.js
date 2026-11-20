@@ -130,7 +130,7 @@
     if (box) safe(() => enhanceSignup(box));
     if (box && !box.querySelector('#password-rules') && !box.querySelector('#fluida-conheca')) {
       const p = document.createElement('p'); p.id = 'fluida-conheca'; p.className = 'm'; p.style.cssText = 'margin:18px 0 0;text-align:center;font-size:15px';
-      p.innerHTML = 'Ainda não usa o Fluida? <a href="/conheca" style="font-weight:700">Conheça e teste grátis por 7 dias</a>';
+      p.innerHTML = 'Ainda não usa o Fluida? <a href="/conheca" style="font-weight:700">Conheça e teste grátis por 30 dias</a>';
       box.appendChild(p);
     }
     if (!box || box.dataset.fluidaBrand) return;

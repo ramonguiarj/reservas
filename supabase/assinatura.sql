@@ -1,6 +1,6 @@
 -- Aplicado em 17/11/2026 (migrações fluida_assinatura_colunas, fluida_assinatura_somente_leitura,
 -- fluida_assinatura_eventos, fluida_admin_overview_assinatura):
--- * accounts: billing_status (trial/pending/active/cancelled/exempt), trial_ends_at (padrão: 7 dias),
+-- * accounts: billing_status (trial/pending/active/cancelled/exempt), trial_ends_at (padrão: 30 dias desde 20/11/2026; antes 7),
 --   paid_until, mp_preapproval_id, billing_email, billing_updated_at. Conta original = exempt.
 -- * Pelo app, authenticated só pode alterar name, cancel_policy, review_url, google_calendar_client_id, branding.
 -- * fluida_account_active(conta): isenta, em teste ou paga.
