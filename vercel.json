@@ -11,6 +11,15 @@
     {
       "source": "/reservar",
       "destination": "/reservar.html"
+    },
+    {
+      "source": "/g/:slug",
+      "destination": "/api/site?slug=:slug"
     }
-  ]
+  ],
+  "functions": {
+    "api/site.js": {
+      "includeFiles": "site.html"
+    }
+  }
 }

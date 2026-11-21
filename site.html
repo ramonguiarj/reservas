@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Passeios</title>
+<meta name="theme-color" content="#07383a">
+<link rel="icon" href="/apple-touch-icon.png">
+<style>
+:root{--c:#07383a;--ink:#16302f;--muted:#5d6f6a;--line:#e1e7e2;--back:#f6f7f3;--card:#fff;--r:18px}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--back);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:var(--c)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+.hero{position:relative;min-height:440px;display:flex;align-items:flex-end;color:#fff;background:var(--c);overflow:hidden}
+.hero .bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,rgba(0,0,0,.25) 45%,rgba(0,0,0,.72) 100%)}
+.hero .wrap{position:relative;z-index:1;padding-top:90px;padding-bottom:34px;width:100%}
+.top{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;justify-content:flex-end;padding:14px 18px;gap:6px}
+.lang button{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px)}
+.lang button[aria-pressed=true]{background:#fff;color:var(--c)}
+.who{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.av{width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid #fff;background:#fff;flex:none}
+.av.txt{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;color:var(--c)}
+.who b{font-size:20px;display:block;line-height:1.2}
+.who span{opacity:.9;font-size:14px}
+.hero h1{font-size:clamp(28px,5.4vw,46px);line-height:1.1;margin:0 0 18px;max-width:760px;letter-spacing:-.5px}
+.cta{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:999px;border:0;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;background:var(--c);color:#fff}
+.btn.light{background:#fff;color:var(--c)}
+.btn.ghost{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.5)}
+.btn.wa{background:#1f8f4e;color:#fff}
+.btn.full{width:100%}
+.btn[disabled]{opacity:.55;cursor:default}
+section{padding:42px 0 6px}
+h2{font-size:26px;margin:0 0 4px;letter-spacing:-.3px}
+.sub{color:var(--muted);margin:0 0 20px}
+.tours{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.tour{background:var(--card);border-radius:var(--r);overflow:hidden;border:1px solid var(--line);display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ph{position:relative;aspect-ratio:4/3;background:#dfe7e2;overflow:hidden}
+.strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.strip img{flex:0 0 100%;width:100%;height:100%;object-fit:cover;scroll-snap-align:start}
+.dots{position:absolute;bottom:9px;left:0;right:0;display:flex;justify-content:center;gap:5px}
+.dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.55)}
+.dots i.on{background:#fff}
+.noph{height:100%;display:flex;align-items:center;justify-content:center;color:var(--c);font-size:44px;opacity:.35}
+.tb{padding:16px 16px 18px;display:flex;flex-direction:column;flex:1}
+.tb h3{margin:0 0 6px;font-size:19px;line-height:1.25}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chip{font-size:12.5px;background:#eef3ef;color:#2f4a45;border-radius:999px;padding:3px 10px;font-weight:600}
+.tb p{margin:0 0 14px;color:#3d524e;font-size:15px}
+.price{margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.price small{display:block;color:var(--muted);font-size:12.5px}
+.price b{font-size:22px;color:var(--c)}
+.about{display:grid;grid-template-columns:1fr;gap:20px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.about p{white-space:pre-wrap;margin:0}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;cursor:zoom-in}
+.revs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.rev{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.rev .st{color:#e3a008;letter-spacing:2px;font-size:15px}
+.rev p{margin:8px 0 10px;white-space:pre-wrap}
+.rev b{font-size:14px}
+.rev span{color:var(--muted);font-size:13px}
+details.q{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 10px}
+details.q summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.q summary:after{content:"+";font-size:20px;line-height:1;color:var(--c)}
+details.q[open] summary:after{content:"–"}
+details.q p{margin:10px 0 0;white-space:pre-wrap;color:#3d524e}
+footer{padding:40px 0 110px;text-align:center;color:var(--muted);font-size:13px}
+footer a{color:var(--muted)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:20;width:58px;height:58px;border-radius:50%;background:#1f8f4e;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.fab svg{width:30px;height:30px;fill:#fff}
+dialog{border:0;padding:0;border-radius:22px 22px 0 0;width:100%;max-width:560px;max-height:92vh;margin:auto auto 0;background:var(--card);color:var(--ink)}
+@media(min-width:640px){dialog{border-radius:22px;margin:auto}}
+dialog::backdrop{background:rgba(10,20,20,.55)}
+.sheet{padding:0 0 18px;overflow:auto;max-height:92vh}
+.sheet .ph{aspect-ratio:16/10}
+.sheet .in{padding:18px}
+.x{position:absolute;top:10px;right:10px;z-index:3;width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;font-size:22px;cursor:pointer}
+.inc{margin:6px 0 14px;padding:0;list-style:none}
+.inc li{padding:4px 0 4px 26px;position:relative}
+.inc li:before{content:"✓";position:absolute;left:4px;color:#1f8f4e;font-weight:800}
+label{display:block;font-weight:700;font-size:14px;margin:14px 0 6px}
+input[type=date]{width:100%;font:inherit;padding:12px;border:1px solid #c9d5cd;border-radius:12px;background:#fff;color:var(--ink)}
+.times{display:flex;flex-wrap:wrap;gap:8px}
+.times button{border:1.5px solid #c9d5cd;background:#fff;border-radius:999px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;color:var(--ink)}
+.times button[aria-pressed=true]{background:var(--c);border-color:var(--c);color:#fff}
+.pax{display:flex;align-items:center;gap:14px}
+.pax button{width:44px;height:44px;border-radius:50%;border:1.5px solid #c9d5cd;background:#fff;font-size:22px;cursor:pointer;color:var(--ink)}
+.pax output{font-size:20px;font-weight:800;min-width:30px;text-align:center}
+.sum{background:#f2f6f2;border-radius:14px;padding:12px 14px;margin:16px 0 4px}
+.sum .r{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.sum .r b{color:var(--c)}
+.sum .big{font-size:20px}
+.err{color:#a12626;font-weight:600;min-height:22px;margin:8px 0 0;font-size:14px}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:20px}
+.lb img{max-height:100%;border-radius:8px}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;color:var(--muted)}
+.load{min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app"><div class="load">…</div></div>
+<dialog id="dlg"></dialog>
+<script>
+(function(){
+  'use strict';
+  var SB = 'https://ewhfabhktkvrjddnvgkl.supabase.co', KEY = 'sb_publishable_SPL6PHiYz1ntLqehGJkRVg_D4a_07QU';
+  var PHOTO = SB + '/storage/v1/object/public/fluida-site/';
+  var I18N = {
+    pt: { tours:'Roteiros', toursSub:'Escolha o passeio, a data e reserve em poucos minutos.', about:'Sobre', gallery:'Galeria', reviews:'O que dizem os clientes', seeGoogle:'Ver avaliações no Google', faq:'Perguntas frequentes', policy:'Política de cancelamento', book:'Reservar', from:'a partir de', perPerson:'por pessoa', perGroup:'por grupo', onRequest:'Valor sob consulta', ask:'Consultar no WhatsApp', whats:'WhatsApp', insta:'Instagram', seeTours:'Ver roteiros', date:'Data', time:'Horário', people:'Pessoas', total:'Total', deposit:'Sinal para garantir', fullPay:'Pagamento', rest:'Restante no dia', next:'Continuar', pickDate:'Escolha a data.', pickTime:'Escolha o horário.', busy:'Esta data não está disponível. Escolha outra.', weekday:'Este passeio não acontece nesse dia da semana.', includes:'O que está incluso', transport:'Transporte incluso', payNote:'No próximo passo você informa seus dados e paga com Pix. A reserva entra direto na agenda do guia.', payNoteNone:'No próximo passo você informa seus dados. O guia confirma o pagamento com você pelo WhatsApp.', notFound:'Página não encontrada.', noTours:'Os roteiros serão publicados em breve. Fale com o guia pelo WhatsApp.', guests:'pessoas', min:'mín.', max:'máx.', hi:'Olá! Vi sua página e quero saber mais', interest:'Olá! Tenho interesse no passeio', made:'Feito com Fluida', privacy:'Privacidade', wait:'Aguarde…' },
+    en: { tours:'Tours', toursSub:'Pick a tour and a date and book in a few minutes.', about:'About', gallery:'Gallery', reviews:'What guests say', seeGoogle:'See reviews on Google', faq:'Frequently asked questions', policy:'Cancellation policy', book:'Book', from:'from', perPerson:'per person', perGroup:'per group', onRequest:'Price on request', ask:'Ask on WhatsApp', whats:'WhatsApp', insta:'Instagram', seeTours:'See tours', date:'Date', time:'Time', people:'Guests', total:'Total', deposit:'Deposit to confirm', fullPay:'Payment', rest:'Balance on the day', next:'Continue', pickDate:'Choose a date.', pickTime:'Choose a time.', busy:'This date is not available. Please choose another one.', weekday:'This tour does not run on this day of the week.', includes:'What is included', transport:'Transport included', payNote:'Next you enter your details and pay with Pix. The booking goes straight into the guide\'s calendar.', payNoteNone:'Next you enter your details. The guide will arrange the payment with you on WhatsApp.', notFound:'Page not found.', noTours:'Tours will be published soon. Message the guide on WhatsApp.', guests:'guests', min:'min.', max:'max.', hi:'Hi! I saw your page and would like to know more', interest:'Hi! I am interested in the tour', made:'Made with Fluida', privacy:'Privacy', wait:'Please wait…' },
+    es: { tours:'Paseos', toursSub:'Elige el paseo y la fecha y reserva en pocos minutos.', about:'Sobre mí', gallery:'Galería', reviews:'Lo que dicen los clientes', seeGoogle:'Ver reseñas en Google', faq:'Preguntas frecuentes', policy:'Política de cancelación', book:'Reservar', from:'desde', perPerson:'por persona', perGroup:'por grupo', onRequest:'Precio a consultar', ask:'Consultar por WhatsApp', whats:'WhatsApp', insta:'Instagram', seeTours:'Ver paseos', date:'Fecha', time:'Horario', people:'Personas', total:'Total', deposit:'Seña para confirmar', fullPay:'Pago', rest:'Saldo el día del paseo', next:'Continuar', pickDate:'Elige la fecha.', pickTime:'Elige el horario.', busy:'Esta fecha no está disponible. Elige otra.', weekday:'Este paseo no se realiza ese día de la semana.', includes:'Qué incluye', transport:'Transporte incluido', payNote:'En el siguiente paso completas tus datos y pagas con Pix. La reserva entra directo en la agenda del guía.', payNoteNone:'En el siguiente paso completas tus datos. El guía acordará el pago contigo por WhatsApp.', notFound:'Página no encontrada.', noTours:'Los paseos se publicarán pronto. Escribe al guía por WhatsApp.', guests:'personas', min:'mín.', max:'máx.', hi:'¡Hola! Vi tu página y quiero saber más', interest:'¡Hola! Me interesa el paseo', made:'Hecho con Fluida', privacy:'Privacidad', wait:'Espera…' }
+  };
+  var params = new URLSearchParams(location.search);
+  var slug = (location.pathname.split('/')[2] || params.get('s') || '').toLowerCase();
+  var lang = (params.get('lang') || (navigator.language || 'pt')).slice(0, 2).toLowerCase();
+  if (!I18N[lang]) lang = 'en';
+  var T = I18N[lang], S = null, app = document.getElementById('app'), dlg = document.getElementById('dlg');
+
+  var esc = function(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var tr = function(o){ if (!o) return ''; if (typeof o === 'string') return o; return o[lang] || o.pt || o.en || o.es || ''; };
+  var money = function(v){ return Number(v || 0).toLocaleString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es' : 'en-US', { style:'currency', currency:'BRL', minimumFractionDigits: Number(v) % 1 ? 2 : 0 }); };
+  var photo = function(u){ u = String(u || ''); return u.indexOf(PHOTO) === 0 && !/["'<>\s]/.test(u) ? u : ''; };
+  var logoOk = function(u){ u = String(u || ''); return (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(u) || u.indexOf(PHOTO) === 0) ? u : ''; };
+  var digits = function(v){ return String(v || '').replace(/\D/g, ''); };
+  var waLink = function(text){ var n = digits(S && S.content.whatsapp); if (n.length < 10) return ''; if (n.length <= 11) n = '55' + n; return 'https://wa.me/' + n + (text ? '?text=' + encodeURIComponent(text) : ''); };
+  var instaLink = function(){ var v = String((S && S.content.instagram) || '').trim().replace(/^@/, ''); if (!v) return ''; if (/^https:\/\/(www\.)?instagram\.com\//.test(v)) return v; return /^[A-Za-z0-9._]{1,30}$/.test(v) ? 'https://instagram.com/' + v : ''; };
+  var WA_ICON = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C8.8 3 3 8.7 3 15.8c0 2.5.7 4.9 2 7L3 29l6.4-2c2 1.1 4.3 1.7 6.6 1.7 7.2 0 13-5.7 13-12.8C29 8.7 23.2 3 16 3zm0 23.4c-2.1 0-4.1-.6-5.9-1.7l-.4-.2-3.8 1.2 1.2-3.7-.3-.4a10.4 10.4 0 0 1-1.6-5.6C5.2 10 10 5.3 16 5.3S26.8 10 26.8 15.8 22 26.4 16 26.4zm5.9-7.8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.3-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.8s1.2 3.2 1.4 3.5c.2.2 2.4 3.6 5.8 5 .8.3 1.4.5 1.9.7.8.3 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>';
+
+  function rpc(fn, args){
+    return fetch(SB + '/rest/v1/rpc/' + fn, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:KEY, Authorization:'Bearer ' + KEY }, body: JSON.stringify(args) })
+      .then(function(r){ return r.json().then(function(d){ if (!r.ok) throw new Error((d && d.message) || 'Erro'); return d; }); });
+  }
+  function sha256(s){ return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function(b){ return Array.prototype.map.call(new Uint8Array(b), function(x){ return ('0' + x.toString(16)).slice(-2); }).join(''); }); }
+
+  function tourPrice(t){ var p = Number(t.data.price || 0); return p > 0 ? p : 0; }
+  function tourPhotos(t){ return (Array.isArray(t.data.photos) ? t.data.photos : []).map(photo).filter(Boolean); }
+  function tourTitle(t){ return tr(t.data.title) || t.name || ''; }
+  function tourDuration(t){ return tr(t.data.duration) || t.duration || ''; }
+  function gallery(urls, cls){
+    if (!urls.length) return '<div class="ph"><div class="noph">⛰</div></div>';
+    return '<div class="ph ' + (cls || '') + '"><div class="strip">' + urls.map(function(u, i){ return '<img src="' + esc(u) + '" alt="" loading="' + (i ? 'lazy' : 'eager') + '">'; }).join('') + '</div>' +
+      (urls.length > 1 ? '<div class="dots">' + urls.map(function(_, i){ return '<i' + (i ? '' : ' class="on"') + '></i>'; }).join('') + '</div>' : '') + '</div>';
+  }
+  function wireStrips(root){
+    root.querySelectorAll('.ph').forEach(function(ph){
+      var st = ph.querySelector('.strip'), dots = ph.querySelectorAll('.dots i'); if (!st || !dots.length) return;
+      st.addEventListener('scroll', function(){ var i = Math.round(st.scrollLeft / st.clientWidth); dots.forEach(function(d, n){ d.className = n === i ? 'on' : ''; }); }, { passive:true });
+    });
+  }
+  function priceHtml(t){
+    var p = tourPrice(t);
+    if (!p) return '<div><b style="font-size:16px">' + T.onRequest + '</b></div>';
+    return '<div><small>' + T.from + '</small><b>' + money(p) + '</b><small>' + (t.data.mode === 'group' ? T.perGroup : T.perPerson) + '</small></div>';
+  }
+
+  function render(){
+    var c = S.content || {}, color = /^#[0-9a-f]{6}$/i.test(S.color || '') ? S.color : '#07383a';
+    document.documentElement.style.setProperty('--c', color);
+    document.querySelector('meta[name=theme-color]').setAttribute('content', color);
+    document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang;
+    document.title = S.business + (tr(c.headline) ? ' · ' + tr(c.headline) : '');
+    var cover = photo(c.cover), av = photo(c.avatar) || logoOk(S.logo), wa = waLink(T.hi), ig = instaLink();
+    var langs = ['pt','en','es'].map(function(l){ return '<button type="button" data-lang="' + l + '" aria-pressed="' + (l === lang) + '">' + l.toUpperCase() + '</button>'; }).join('');
+    var h = '<header class="hero">' + (cover ? '<div class="bg" style="background-image:url(\'' + esc(cover) + '\')"></div>' : '') +
+      '<div class="top lang">' + langs + '</div><div class="wrap">' +
+      '<div class="who">' + (av ? '<img class="av" src="' + esc(av) + '" alt="">' : '<div class="av txt">' + esc(String(S.business || '?').charAt(0).toUpperCase()) + '</div>') +
+      '<div><b>' + esc(S.business) + '</b>' + (tr(c.tagline) ? '<span>' + esc(tr(c.tagline)) + '</span>' : '') + '</div></div>' +
+      '<h1>' + esc(tr(c.headline) || T.tours) + '</h1>' +
+      '<div class="cta"><a class="btn light" href="#roteiros">' + T.seeTours + '</a>' + (wa ? '<a class="btn wa" target="_blank" rel="noopener" href="' + esc(wa) + '">' + T.whats + '</a>' : '') + (ig ? '<a class="btn ghost" target="_blank" rel="noopener" href="' + esc(ig) + '">' + T.insta + '</a>' : '') + '</div>' +
+      '</div></header><main class="wrap">';
+
+    h += '<section id="roteiros"><h2>' + T.tours + '</h2><p class="sub">' + T.toursSub + '</p>';
+    if (!S.tours.length) h += '<div class="empty">' + T.noTours + '</div>';
+    else h += '<div class="tours">' + S.tours.map(function(t, i){
+      var chips = [];
+      if (tourDuration(t)) chips.push('⏱ ' + esc(tourDuration(t)));
+      if (t.transport) chips.push('🚐 ' + T.transport);
+      if (Array.isArray(t.data.times) && t.data.times.length) chips.push('🕘 ' + esc(t.data.times.join(' · ')));
+      return '<article class="tour">' + gallery(tourPhotos(t)) + '<div class="tb"><h3>' + esc(tourTitle(t)) + '</h3>' +
+        (chips.length ? '<div class="meta">' + chips.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>' : '') +
+        (tr(t.data.desc) ? '<p>' + esc(tr(t.data.desc)) + '</p>' : '') +
+        '<div class="price">' + priceHtml(t) + '<button type="button" class="btn" data-tour="' + i + '">' + (tourPrice(t) ? T.book : T.ask) + '</button></div></div></article>';
+    }).join('') + '</div>';
+    h += '</section>';
+
+    if (tr(c.about)) h += '<section id="sobre"><h2>' + T.about + '</h2><div class="about"><p>' + esc(tr(c.about)) + '</p></div></section>';
+    var gal = (Array.isArray(c.gallery) ? c.gallery : []).map(photo).filter(Boolean);
+    if (gal.length) h += '<section id="galeria"><h2>' + T.gallery + '</h2><div class="gal">' + gal.map(function(u){ return '<img src="' + esc(u) + '" alt="" loading="lazy">'; }).join('') + '</div></section>';
+    var revs = (Array.isArray(c.reviews) ? c.reviews : []).filter(function(r){ return r && r.text; });
+    if (revs.length || S.review_url) {
+      h += '<section id="avaliacoes"><h2>' + T.reviews + '</h2>';
+      if (revs.length) h += '<div class="revs">' + revs.map(function(r){ var n = Math.max(0, Math.min(5, Number(r.stars) || 5)); return '<div class="rev"><div class="st">' + '★★★★★'.slice(0, n) + '<span style="color:#d6dcd8">' + '★★★★★'.slice(0, 5 - n) + '</span></div><p>' + esc(tr(r.text)) + '</p><b>' + esc(r.name || '') + '</b>' + (r.from ? ' <span>· ' + esc(r.from) + '</span>' : '') + '</div>'; }).join('') + '</div>';
+      if (/^https:\/\//.test(S.review_url || '')) h += '<p style="margin-top:14px"><a class="btn" style="background:#fff;color:var(--c);border:2px solid var(--c)" target="_blank" rel="noopener" href="' + esc(S.review_url) + '">★ ' + T.seeGoogle + '</a></p>';
+      h += '</section>';
+    }
+    var faq = (Array.isArray(c.faq) ? c.faq : []).filter(function(f){ return f && tr(f.q) && tr(f.a); });
+    if (faq.length || S.cancel_policy) {
+      h += '<section id="faq"><h2>' + T.faq + '</h2>' + faq.map(function(f){ return '<details class="q"><summary>' + esc(tr(f.q)) + '</summary><p>' + esc(tr(f.a)) + '</p></details>'; }).join('');
+      if (S.cancel_policy) h += '<details class="q"><summary>' + T.policy + '</summary><p>' + esc(tr(c.policy) || S.cancel_policy) + '</p></details>';
+      h += '</section>';
+    }
+    h += '</main><footer>' + esc(S.business) + ' · <a href="/conheca">' + T.made + '</a> · <a href="/privacidade.html">' + T.privacy + '</a></footer>';
+    if (wa) h += '<a class="fab" target="_blank" rel="noopener" aria-label="WhatsApp" href="' + esc(wa) + '">' + WA_ICON + '</a>';
+    app.innerHTML = h;
+    wireStrips(app);
+    app.querySelectorAll('[data-lang]').forEach(function(b){ b.onclick = function(){ lang = b.dataset.lang; T = I18N[lang]; var u = new URL(location.href); u.searchParams.set('lang', lang); history.replaceState(null, '', u); render(); }; });
+    app.querySelectorAll('[data-tour]').forEach(function(b){ b.onclick = function(){ var t = S.tours[Number(b.dataset.tour)]; if (tourPrice(t)) openBook(t); else { var l = waLink(T.interest + ': ' + tourTitle(t)); if (l) window.open(l, '_blank', 'noopener'); } }; });
+    app.querySelectorAll('.gal img').forEach(function(im){ im.onclick = function(){ var d = document.createElement('div'); d.className = 'lb'; d.innerHTML = '<img src="' + esc(im.src) + '" alt="">'; d.onclick = function(){ d.remove(); }; document.body.appendChild(d); }; });
+  }
+
+  function addDays(iso, n){ var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function openBook(t){
+    var d = t.data, min = Math.max(1, Number(d.min_pax) || 1), max = Math.max(min, Math.min(200, Number(d.max_pax) || 20));
+    var adv = Number(d.min_advance_days != null && d.min_advance_days !== '' ? d.min_advance_days : (S.content.min_advance_days != null && S.content.min_advance_days !== '' ? S.content.min_advance_days : 1)) || 0;
+    var minDate = addDays(S.today, adv), maxDate = addDays(S.today, 365);
+    var times = Array.isArray(d.times) ? d.times.filter(function(x){ return /^\d{2}:\d{2}$/.test(x); }) : [];
+    var wd = Array.isArray(d.weekdays) ? d.weekdays.map(Number) : [];
+    var pct = Math.max(10, Math.min(100, Number(d.deposit_pct || S.content.deposit_pct || 30)));
+    var pax = Math.max(min, Math.min(max, 2)), time = times.length === 1 ? times[0] : '';
+    var inc = String(tr(d.includes) || '').split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+    dlg.innerHTML = '<div class="sheet"><button type="button" class="x" aria-label="Fechar">×</button>' + gallery(tourPhotos(t)) + '<div class="in">' +
+      '<h2 style="font-size:22px">' + esc(tourTitle(t)) + '</h2>' +
+      (tr(d.desc) ? '<p style="margin:6px 0 0;color:#3d524e">' + esc(tr(d.desc)) + '</p>' : '') +
+      (inc.length ? '<label style="margin-top:16px">' + T.includes + '</label><ul class="inc">' + inc.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+      '<label for="bd">' + T.date + '</label><input type="date" id="bd" min="' + minDate + '" max="' + maxDate + '">' +
+      (times.length ? '<label>' + T.time + '</label><div class="times">' + times.map(function(x){ return '<button type="button" data-t="' + x + '" aria-pressed="' + (x === time) + '">' + x + '</button>'; }).join('') + '</div>' : '') +
+      '<label>' + T.people + ' <span style="font-weight:400;color:var(--muted)">(' + T.min + ' ' + min + ' · ' + T.max + ' ' + max + ')</span></label><div class="pax"><button type="button" id="pm" aria-label="-">−</button><output id="pv">' + pax + '</output><button type="button" id="pp" aria-label="+">+</button></div>' +
+      '<div class="sum" id="sum"></div><p class="err" id="er" role="alert"></p>' +
+      '<button type="button" class="btn full" id="go">' + T.next + '</button>' +
+      '<p class="note">' + (S.pay_mode === 'none' ? T.payNoteNone : T.payNote) + '</p></div></div>';
+    if (!dlg.open) dlg.showModal();
+    wireStrips(dlg);
+    var $ = function(s){ return dlg.querySelector(s); }, er = $('#er');
+    function totals(){ var p = tourPrice(t), tot = d.mode === 'group' ? p : Math.round(p * pax * 100) / 100, dep = Math.max(1, Math.round(tot * pct) / 100); if (dep > tot) dep = tot; return { tot: tot, dep: dep }; }
+    function paint(){
+      $('#pv').textContent = pax; $('#pm').disabled = pax <= min; $('#pp').disabled = pax >= max;
+      var x = totals();
+      $('#sum').innerHTML = '<div class="r"><span>' + T.total + (d.mode === 'group' ? '' : ' · ' + pax + ' ' + T.guests) + '</span><b>' + money(x.tot) + '</b></div>' +
+        (x.dep >= x.tot ? '<div class="r"><span>' + T.fullPay + '</span><b class="big">' + money(x.dep) + '</b></div>' :
+        '<div class="r"><span>' + T.deposit + ' (' + pct + '%)</span><b class="big">' + money(x.dep) + '</b></div><div class="r" style="color:var(--muted);font-size:14px"><span>' + T.rest + '</span><span>' + money(x.tot - x.dep) + '</span></div>');
+    }
+    function checkDate(){
+      var v = $('#bd').value; er.textContent = ''; if (!v) return false;
+      if (v < minDate || v > maxDate) { er.textContent = T.busy; return false; }
+      if ((S.busy || []).indexOf(v) >= 0) { er.textContent = T.busy; return false; }
+      if (wd.length && wd.indexOf(new Date(v + 'T12:00:00Z').getUTCDay()) < 0) { er.textContent = T.weekday; return false; }
+      return true;
+    }
+    $('.x').onclick = function(){ dlg.close(); };
+    dlg.onclick = function(e){ if (e.target === dlg) dlg.close(); };
+    $('#bd').onchange = checkDate;
+    $('#pm').onclick = function(){ if (pax > min) { pax--; paint(); } };
+    $('#pp').onclick = function(){ if (pax < max) { pax++; paint(); } };
+    dlg.querySelectorAll('[data-t]').forEach(function(b){ b.onclick = function(){ time = b.dataset.t; er.textContent = ''; dlg.querySelectorAll('[data-t]').forEach(function(o){ o.setAttribute('aria-pressed', String(o === b)); }); }; });
+    paint();
+    $('#go').onclick = function(){
+      var go = this;
+      if (!$('#bd').value) { er.textContent = T.pickDate; return; }
+      if (!checkDate()) return;
+      if (times.length && !time) { er.textContent = T.pickTime; return; }
+      go.disabled = true; go.textContent = T.wait; er.textContent = '';
+      var raw = crypto.getRandomValues(new Uint8Array(24)), tk = btoa(String.fromCharCode.apply(null, raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      sha256(tk).then(function(h){ return rpc('fluida_site_start_booking', { p_slug: slug, p_tour: t.id, p_date: $('#bd').value, p_time: time || null, p_pax: pax, p_hash: h }); })
+        .then(function(){ location.href = '/reservar?t=' + tk + '&lang=' + lang; })
+        .catch(function(e){ er.textContent = e.message; go.disabled = false; go.textContent = T.next; });
+    };
+  }
+
+  if (!/^[a-z0-9-]{3,40}$/.test(slug)) { app.innerHTML = '<div class="load">' + T.notFound + '</div>'; return; }
+  rpc('fluida_site_public', { p_slug: slug }).then(function(d){
+    if (!d) { app.innerHTML = '<div class="load">' + T.notFound + '</div>'; return; }
+    S = d; S.content = S.content || {}; S.tours = Array.isArray(S.tours) ? S.tours : [];
+    var langs = Array.isArray(S.content.langs) && S.content.langs.length ? S.content.langs : null;
+    if (!params.get('lang') && langs && langs.indexOf(lang) < 0) { lang = langs.indexOf('en') >= 0 && lang !== 'pt' ? 'en' : 'pt'; T = I18N[lang]; }
+    render();
+  }).catch(function(){ app.innerHTML = '<div class="load">' + T.notFound + '</div>'; });
+})();
+</script>
+</body>
+</html>
